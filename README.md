@@ -22,10 +22,8 @@ To compile this project you need following software packages:
 
 ### Download and compiling
 
-TODO: Add git clone with the correct URL
-
 ``` bash
-git clone URL
+git clone https://github.com/der-b/gcoded.git
 cd gcoded
 mkdir build
 cd build
