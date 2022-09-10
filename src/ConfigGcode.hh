@@ -1,7 +1,7 @@
 #ifndef __CONFIGGCODE_HH__
 #define __CONFIGGCODE_HH__
 
-#include <list>
+#include <vector>
 #include <optional>
 #include <filesystem>
 #include "MQTTConfig.hh"
@@ -76,7 +76,7 @@ class ConfigGcode : public MQTTConfig {
         /**
          * command_args()
          */
-        const std::list<std::string> &command_args() const {
+        const std::vector<std::string> &command_args() const {
             return m_command_args;
         }
 
@@ -115,7 +115,7 @@ class ConfigGcode : public MQTTConfig {
         bool m_load_dummy;
         bool m_print_help;
         std::optional<std::string> m_command;
-        std::list<std::string> m_command_args;
+        std::vector<std::string> m_command_args;
 };
 
 std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf);

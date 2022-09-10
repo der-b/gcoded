@@ -22,23 +22,22 @@ int send(Client &client, const ConfigGcode &conf)
         return 1;
     }
 
-    if (2 == c_args_size) {
-        std::cerr << "TODO: DEVICE_HINT is not yet implemented!\n";
-        return 1;
-    }
-
     if (2 < c_args_size) {
         std::cerr << "Too many arguments for send command. See 'gcode send --help'.\n";
         return 1;
     }
 
-    const std::string &filename = conf.command_args().front();
+    const std::string &filename = conf.command_args()[0];
     if (!std::filesystem::exists(filename)) {
         std::cerr << "Gcode file does not exist: " << filename << "\n";
         return 1;
     }
 
-    std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices();
+    std::string hint = "*";
+    if (2 <= c_args_size) {
+        hint = conf.command_args()[1];
+    }
+    std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices(hint);
     
     if (0 == devices->size()) {
         std::cerr << "No devices found.\n";
@@ -100,7 +99,16 @@ int main(int argc, char **argv)
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     if ("list" == *conf.command()) {
-        std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices();
+        const size_t c_args_size = conf.command_args().size();
+        if (1 < c_args_size) {
+            std::cerr << "Too many arguments for list command. See 'gcode list --help'.\n";
+            return 1;
+        }
+        std::string hint = "*";
+        if (1 <= c_args_size) {
+            hint = conf.command_args()[0];
+        }
+        std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices(hint);
 
         for (const auto &dev: *devices) {
             std::cout << dev.provider << "/" << dev.name << " " << Device::state_to_str(dev.state) << "\n";

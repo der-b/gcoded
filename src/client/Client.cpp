@@ -23,6 +23,16 @@ Client::Client(const ConfigGcode &conf)
         throw std::runtime_error(err);
     }
 
+    // make like expressions case sensitive
+    ret = sqlite3_exec(m_db, "PRAGMA case_sensitive_like = true", NULL, NULL, NULL);
+    if (ret) {
+        sqlite3_close(m_db);
+        m_db = nullptr;
+        std::string err = "Could not make like expressions case sensitive: ";
+        err += sqlite3_errmsg(m_db);
+        throw std::runtime_error(err);
+    }
+
     { // create devices table
         sqlite3_stmt *stmt;
         std::string s_stmt = "CREATE TABLE devices "
@@ -32,7 +42,6 @@ Client::Client(const ConfigGcode &conf)
                              "state INTEGER, "
                              "PRIMARY KEY (provider, device)"
                              ")";
-                             
 
         int ret = sqlite3_prepare_v2(m_db,
                                      s_stmt.data(),
@@ -79,7 +88,7 @@ Client::Client(const ConfigGcode &conf)
                 const auto now = std::chrono::steady_clock::now();
                 for (auto iter = m_print_callbacks.begin(); iter != m_print_callbacks.end();) {
                     if (now > iter->second.timeout) {
-                        iter->second.callback(*iter->second.device, Device::PrintResult::NET_ERR_TIMEOUT), 
+                        iter->second.callback(*iter->second.device, Device::PrintResult::NET_ERR_TIMEOUT),
                         iter = m_print_callbacks.erase(iter);
                     } else {
                         iter++;
@@ -115,7 +124,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
     const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
     const std::string state_postfix = "/state";
     const std::string print_postfix = "/print";
-    
+
     ssize_t res;
     if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
         std::cerr << "Unexpected mqtt topic prefix\n";
@@ -236,13 +245,19 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 /*
  * devices()
  */
-std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices()
+std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::string &hint)
 {
     int ret;
     std::unique_ptr<std::vector<Client::DeviceInfo>> devices = std::make_unique<std::vector<Client::DeviceInfo>>();
     sqlite3_stmt *stmt;
 
-    std::string s_stmt = "SELECT provider, device, state FROM devices ORDER BY device, provider;";
+    std::pair<std::string, std::string> sql_hints = convert_hint(hint);
+
+    std::string s_stmt =  "SELECT provider, device, state FROM devices WHERE device LIKE '"
+                        + sql_hints.second
+                        + "' ESCAPE '\\' AND provider LIKE '"
+                        + sql_hints.first
+                        + "' ESCAPE '\\' ORDER BY device, provider;";
     ret = sqlite3_prepare_v2(m_db,
                              s_stmt.data(),
                              s_stmt.size(),
@@ -284,4 +299,58 @@ void Client::print(const Client::DeviceInfo &dev, const std::string &gcode, std:
     print.encode(payload);
     std::string topic = m_conf.mqtt_prefix() + "/clients/" + dev.provider + "/" + dev.name + "/print";
     m_mqtt.publish(topic, payload);
+}
+
+/*
+ * convert_hint()
+ */
+std::pair<std::string, std::string> Client::convert_hint(const std::string &hint) const
+{
+    if (   hint.find("'") != std::string::npos
+        || hint.find("\"") != std::string::npos) {
+        throw std::runtime_error("DEVICE_HINT contains invalid characters (' or \")");
+    }
+    std::string::size_type pos = hint.find("/");
+    std::string provider_hint;
+    std::string device_hint;
+    if (pos == std::string::npos) {
+        provider_hint = "*";
+        device_hint = hint;
+    } else {
+        provider_hint = hint.substr(0, pos);
+        device_hint = hint.substr(pos+1);
+    }
+
+    auto escape = [](std::string &hint, const std::string &symbol) {
+        std::string::size_type pos = hint.find(symbol);
+        while (pos != std::string::npos) {
+            hint.insert(pos, 1, '\\');
+            pos = hint.find(symbol, pos+2);
+        }
+    };
+
+    escape(provider_hint, "%");
+    escape(provider_hint, "_");
+    escape(device_hint, "%");
+    escape(device_hint, "_");
+
+    bool last_was_bslash = false;
+    auto replace_asterisk = [&last_was_bslash](char c) {
+            bool ret = false;
+            if (c == '*' && !last_was_bslash) {
+                ret = true;
+            }
+            last_was_bslash = false;
+            if (c == '\\') {
+                last_was_bslash = true;
+            }
+            return ret;
+    };
+
+    std::replace_if(provider_hint.begin(), provider_hint.end(), replace_asterisk, '%');
+
+    last_was_bslash = false;
+    std::replace_if(device_hint.begin(), device_hint.end(), replace_asterisk, '%');
+
+    return std::pair<std::string, std::string>(provider_hint, device_hint);
 }

@@ -53,11 +53,18 @@ cd gcoded/build
 ./gcode list
 ```
 
-Send a Gcode file to **_all_** available printers (TODO: Device selection is not yet implemented):
+Send a G-code file to **_all_** available printers:
 
 ``` bash
 cd gcoded/bild
 ./gcode send path/to/gcode_file.gcode
+```
+
+Send a G-code file to a specific device:
+
+``` bash
+cd gcoded/bild
+./gcode send path/to/gcode_file.gcode DeviceName
 ```
 
 ## Supported Devices

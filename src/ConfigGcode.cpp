@@ -32,9 +32,15 @@ const char help_message[] =
 "send         Sends a gcode file to an device.\n";
 
 
-const char list_usage_message[] = "gcode [OPTIONS] list\n";
+const char list_usage_message[] = "gcode [OPTIONS] list [DEVICE_HINT]\n";
 const char list_help_message[] =
-"List all currently known devices which can process gcode.\n";
+"List all currently known devices which can process gcode.\n"
+"DEVICE_HINT  A hint to which device the gcode file shall be send.\n"
+"             If no hint is given, than the file will be send to all known devices.\n"
+"             The hint accepts '*' as a wildcard and tries to match device names.\n"
+"             If you want to match all devices of one provider, than you have to provide a\n"
+"             hint like 'providername/*'.\n"
+"             If a hint matches for more than one device, you will be prompt whether you are sure.\n";
 
 const char send_usage_message[] = "gcode [OPTIONS] send GCODE_FILE [DEVICE_HINT]\n";
 const char send_help_message[] =

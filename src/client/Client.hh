@@ -23,8 +23,16 @@ class Client : public MQTT::Listener {
         ~Client();
 
         virtual void on_message(const char *topic, const char *payload, size_t payload_len) override;
-        std::unique_ptr<std::vector<DeviceInfo>> devices();
+        std::unique_ptr<std::vector<DeviceInfo>> devices(const std::string &hint = "*");
         void print(const DeviceInfo &dev, const std::string &gcode, std::function<void(const DeviceInfo &, Device::PrintResult)> callback);
+
+    private:
+        /**
+         * Converts a hint to an expression to expressions, which can be used in SQL statements.
+         * The first string of the result pair is the like expression for the provider and the
+         * second string is the like expression for the device.
+         */
+        std::pair<std::string, std::string> convert_hint(const std::string &hint) const;
 
     private:
         const ConfigGcode &m_conf;
@@ -42,7 +50,7 @@ class Client : public MQTT::Listener {
 
             print_callback_helper(std::chrono::time_point<std::chrono::steady_clock> _timeout,
                                   std::function<void(const DeviceInfo, Device::PrintResult)> _callback,
-                                  const DeviceInfo &_device) 
+                                  const DeviceInfo &_device)
                 : timeout(_timeout),
                   callback(_callback),
                   device(&_device)
