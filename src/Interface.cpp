@@ -29,7 +29,7 @@ Interface::~Interface()
     const std::lock_guard<std::mutex> guard(m_mutex);
     Detector::get(m_conf).unregister_on_new_device(this);
     Detector::get(m_conf).for_each_device([this](const std::shared_ptr<Device> &dev) {
-        dev->unregister_on_state_change(this);
+        dev->unregister_listener(this);
     });
     // delete all retained messages
     for (const auto &r_topic: m_retain_topics) {
@@ -46,7 +46,7 @@ void Interface::on_new_device(const std::shared_ptr<Device> &dev)
 {
     {
         const std::lock_guard<std::mutex> guard(m_mutex);
-        dev->register_on_state_change(this);
+        dev->register_listener(this);
     }
     on_state_change(*dev, dev->state());
 }

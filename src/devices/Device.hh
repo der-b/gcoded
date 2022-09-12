@@ -69,6 +69,15 @@ class Device {
         class Listener {
             public:
                 virtual void on_state_change(Device &device, enum State new_state) = 0;
+
+                /**
+                 * If the device is printing, this method is called when gcode M73 is transmitted to the pritner.
+                 * See: https://www.reprap.org/wiki/G-code#M73:_Set.2FGet_build_percentage
+                 *
+                 * The unit of remaining_time is minutes.
+                 */
+                virtual void on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time)
+                {}
         };
 
         struct value {
@@ -99,16 +108,16 @@ class Device {
          */
         virtual PrintResult print(const std::string &gcode) = 0;
 
-        void register_on_state_change(Listener *list)
+        void register_listener(Listener *list)
         {
             const std::lock_guard<std::recursive_mutex> guard(m_mutex);
-            m_state_listeners.insert(list);
+            m_listeners.insert(list);
         }
 
-        void unregister_on_state_change(Listener *list)
+        void unregister_listener(Listener *list)
         {
             const std::lock_guard<std::recursive_mutex> guard(m_mutex);
-            m_state_listeners.erase(list);
+            m_listeners.erase(list);
         }
 
     protected:
@@ -120,16 +129,25 @@ class Device {
         {
             const std::lock_guard<std::recursive_mutex> guard(m_mutex);
             m_state = new_state;
-            for (auto const &list: m_state_listeners) {
+            for (auto const &list: m_listeners) {
                 // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
                 // TODO: Uncouple this, so that the callbacks runs on a normal thread
                 list->on_state_change(*this, m_state);
             }
         }
+
+        void update_progress(unsigned percentage, unsigned remaining_time) {
+            const std::lock_guard<std::recursive_mutex> guard(m_mutex);
+            for (auto const &list: m_listeners) {
+                // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
+                // TODO: Uncouple this, so that the callbacks runs on a normal thread
+                list->on_build_progress_change(*this, percentage, remaining_time);
+            }
+        }
     private:
         std::recursive_mutex m_mutex;
         State m_state;
-        std::set<Listener *> m_state_listeners;
+        std::set<Listener *> m_listeners;
 };
 
 #endif

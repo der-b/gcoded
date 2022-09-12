@@ -25,7 +25,7 @@ PrusaDetector::~PrusaDetector()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     for (auto &dev: m_devices) {
-        dev->unregister_on_state_change(this);
+        dev->unregister_listener(this);
     }
 }
 
@@ -136,7 +136,7 @@ void PrusaDetector::check_candidate(const std::string &filename)
 
             std::shared_ptr<Device> new_dev = std::make_shared<PrusaDevice>(device_file, device_name);
 
-            new_dev->register_on_state_change(this);
+            new_dev->register_listener(this);
 
             if (   new_dev->state() != Device::State::ERROR
                 && new_dev->state() != Device::State::DISCONNECTED) {

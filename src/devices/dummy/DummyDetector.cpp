@@ -8,10 +8,10 @@ DummyDetector::DummyDetector()
 {
     std::cout << "DummyDetector::" << __func__ << "()\n";
     std::shared_ptr<Device> dev = std::make_shared<DummyDevice>("StaticDummyDevice");
-    dev->register_on_state_change(this);
+    dev->register_listener(this);
     m_devices.push_back(dev);
     dev = std::make_shared<DummyDevice>("StaticDummyDevice2");
-    dev->register_on_state_change(this);
+    dev->register_listener(this);
     m_devices.push_back(dev);
 }
 
@@ -24,7 +24,7 @@ DummyDetector::~DummyDetector()
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "DummyDetector::" << __func__ << "()\n";
     for (auto &dev: m_devices) {
-        dev->unregister_on_state_change(this);
+        dev->unregister_listener(this);
     }
 }
 

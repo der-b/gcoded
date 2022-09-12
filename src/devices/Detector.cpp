@@ -23,7 +23,7 @@ Detector::~Detector()
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     for (auto &dev: m_devices) {
-        dev->unregister_on_state_change(this);
+        dev->unregister_listener(this);
     }
 }
 
@@ -35,7 +35,7 @@ void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "New prusa device: " << device->name() << "\n";
-    device->register_on_state_change(this);
+    device->register_listener(this);
 
     if (device->is_valid()) {
         m_devices.push_back(device);
@@ -53,7 +53,7 @@ void Detector::on_new_dummy_device(const std::shared_ptr<Device> &device)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "New dummy device: " << device->name() << "\n";
-    device->register_on_state_change(this);
+    device->register_listener(this);
 
     if (device->is_valid()) {
         m_devices.push_back(device);
