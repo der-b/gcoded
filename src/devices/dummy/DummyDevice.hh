@@ -2,6 +2,9 @@
 #define __DUMMY_DEVICE_HH__
 
 #include "../Device.hh"
+#include <mutex>
+#include <list>
+#include <thread>
 
 class DummyDevice : public Device {
     public:
@@ -21,6 +24,13 @@ class DummyDevice : public Device {
         }
     private:
         std::string m_device;
+        std::mutex m_mutex;
+        std::list<std::string> m_curr_print;
+        std::thread m_print_job;
+        size_t m_commands;
+        int m_progress;
+        int m_remaining_time;
+        bool m_running;
 };
 
 #endif
