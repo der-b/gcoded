@@ -73,7 +73,7 @@ Client::Client(const ConfigGcode &conf)
     m_mqtt.register_listener(this);
 
     std::string state_topic = conf.mqtt_prefix() + "/clients/+/+/state";
-    std::string print_topic = conf.mqtt_prefix() + "/clients/+/+/print";
+    std::string print_topic = conf.mqtt_prefix() + "/clients/+/+/print_response";
     m_mqtt.subscribe(state_topic);
     m_mqtt.subscribe(print_topic);
 
@@ -123,7 +123,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 {
     const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
     const std::string state_postfix = "/state";
-    const std::string print_postfix = "/print";
+    const std::string print_postfix = "/print_response";
 
     ssize_t res;
     if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
@@ -216,12 +216,6 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
         const std::string device(pos+1, last);
 
         const std::vector<char> msg_buf(payload, payload + payload_len);
-        MsgType msg;
-        msg.decode(msg_buf);
-        if (MsgType::Type::PRINT_RESPONSE != msg.type()) {
-            return;
-        }
-
         MsgPrintResponse msg_response;
         msg_response.decode(msg_buf);
 
@@ -297,7 +291,7 @@ void Client::print(const Client::DeviceInfo &dev, const std::string &gcode, std:
     }
     std::vector<char> payload;
     print.encode(payload);
-    std::string topic = m_conf.mqtt_prefix() + "/clients/" + dev.provider + "/" + dev.name + "/print";
+    std::string topic = m_conf.mqtt_prefix() + "/clients/" + dev.provider + "/" + dev.name + "/print_request";
     m_mqtt.publish(topic, payload);
 }
 

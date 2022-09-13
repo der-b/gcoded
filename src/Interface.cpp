@@ -14,7 +14,7 @@ Interface::Interface(const Config &conf)
     {
         const std::lock_guard<std::mutex> guard(m_mutex);
         m_mqtt.register_listener(this);
-        std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/+/print";
+        std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/+/print_request";
         m_mqtt.subscribe(topic);
         m_mqtt.start();
     }
@@ -76,8 +76,9 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
  */
 void Interface::on_message(const char *topic, const char *payload, size_t payload_len)
 {
+    // TODO: The client ID is already known, therefore the logic here can be simplified
     const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
-    const std::string print_postfix = "/print";
+    const std::string print_postfix = "/print_request";
     
     ssize_t res;
     if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
@@ -100,12 +101,6 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
         const std::string device(pos+1, last);
 
         const std::vector<char> msg_buf(payload, payload + payload_len);
-        MsgType msg;
-        msg.decode(msg_buf);
-        if (MsgType::Type::PRINT != msg.type()) {
-            return;
-        }
-
         MsgPrint print_msg;
         print_msg.decode(msg_buf);
 
@@ -126,6 +121,7 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
         MsgPrintResponse response_msg(print_msg, result);
         std::vector<char> response_buf;
         response_msg.encode(response_buf);
-        m_mqtt.publish(topic, response_buf.data(), response_buf.size());
+        std::string response_topic = prefix + m_conf.mqtt_client_id() + "/" + device + "/print_response";
+        m_mqtt.publish(response_topic, response_buf);
     }
 }
