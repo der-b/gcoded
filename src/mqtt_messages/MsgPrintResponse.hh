@@ -11,6 +11,7 @@ class MsgPrintResponse : public Msg {
     public:
         MsgPrintResponse();
         MsgPrintResponse(const MsgPrint &print_msg, Device::PrintResult print_result);
+        virtual ~MsgPrintResponse() {};
 
         struct header_msg {
             // 128 bit response identifier copied from the MsgPrint message

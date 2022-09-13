@@ -10,6 +10,7 @@ class ConfigGcode : public MQTTConfig {
     public:
         ConfigGcode() = delete;
         ConfigGcode(int argc, char **argv);
+        virtual ~ConfigGcode() {};
 
         /**
          * returns the configuration file, which was loaded, if any file was loaded.

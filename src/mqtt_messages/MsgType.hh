@@ -29,6 +29,8 @@ class MsgType : public Msg {
             m_msg.type = (uint8_t)type;
         }
 
+        virtual ~MsgType() {};
+
         enum Type type() const
         {
             return (enum Type)m_msg.type;

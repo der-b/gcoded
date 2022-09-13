@@ -11,6 +11,7 @@ class DummyDetector : public Device::Listener {
         class Listener {
             public:
                 virtual void on_new_dummy_device(const std::shared_ptr<Device> &device) = 0;
+                virtual ~Listener() {};
         };
 
         /**
@@ -26,7 +27,7 @@ class DummyDetector : public Device::Listener {
         DummyDetector(const DummyDetector &) = delete;
         DummyDetector(DummyDetector &&) = delete;
         DummyDetector &operator=(const DummyDetector &) = delete;
-        ~DummyDetector();
+        virtual ~DummyDetector();
 
         /**
          * Listener will be called for all existing devices and all devices which will be detected in 

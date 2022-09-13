@@ -17,6 +17,7 @@ class Detector : public PrusaDetector::Listener, public Device::Listener, public
         class Listener {
             public:
                 virtual void on_new_device(const std::shared_ptr<Device> &dev) = 0;
+                virtual ~Listener() {};
         };
 
         /**
@@ -33,7 +34,7 @@ class Detector : public PrusaDetector::Listener, public Device::Listener, public
         Detector(const Detector &) = delete;
         Detector(Detector &&) = delete;
         Detector &operator=(const Detector &) = delete;
-        ~Detector();
+        virtual ~Detector();
 
         void for_each_device(std::function<void(const std::shared_ptr<Device> &)> fun)
         {

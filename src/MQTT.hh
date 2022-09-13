@@ -16,6 +16,7 @@ class MQTT {
         class Listener {
             public:
                 virtual void on_message(const char *topic, const char *payload, size_t payload_len) = 0;
+                virtual ~Listener() {};
         };
 
     public:

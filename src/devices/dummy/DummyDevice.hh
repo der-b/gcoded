@@ -11,7 +11,7 @@ class DummyDevice : public Device {
         DummyDevice &operator=(const DummyDevice &) = delete;
 
         DummyDevice(const std::string &name);
-        ~DummyDevice();
+        virtual ~DummyDevice();
 
         virtual PrintResult print_file(const std::string &file_path) override;
         virtual PrintResult print(const std::string &gcode) override;

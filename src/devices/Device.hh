@@ -78,6 +78,8 @@ class Device {
                  */
                 virtual void on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time)
                 {}
+
+                virtual ~Listener() {};
         };
 
         struct value {
@@ -119,6 +121,8 @@ class Device {
             const std::lock_guard<std::recursive_mutex> guard(m_mutex);
             m_listeners.erase(list);
         }
+
+        virtual ~Device() {};
 
     protected:
         Device()

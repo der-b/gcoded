@@ -24,6 +24,7 @@ class Msg {
          */
         virtual size_t decode(const std::vector<char> &encoded_msg) = 0;
 
+        virtual ~Msg() {};
 };
 
 #endif

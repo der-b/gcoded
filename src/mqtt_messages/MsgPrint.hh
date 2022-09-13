@@ -9,6 +9,7 @@ class MsgPrint : public Msg {
     public:
         MsgPrint();
         MsgPrint(const std::string &gcode);
+        virtual ~MsgPrint() {};
 
         struct header_msg {
             // 128 bit random number, which will be copied to the respons message

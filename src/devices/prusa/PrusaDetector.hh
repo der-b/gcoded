@@ -17,6 +17,7 @@ class PrusaDetector : public Inotify::Listener, public Device::Listener {
         class Listener {
             public:
                 virtual void on_new_prusa_device(const std::shared_ptr<Device> &device) = 0;
+                virtual ~Listener() {};
         };
 
         /**
@@ -32,7 +33,7 @@ class PrusaDetector : public Inotify::Listener, public Device::Listener {
         PrusaDetector(const PrusaDetector &) = delete;
         PrusaDetector(PrusaDetector &&) = delete;
         PrusaDetector &operator=(const PrusaDetector &) = delete;
-        ~PrusaDetector();
+        virtual ~PrusaDetector();
 
         /**
          * Listener will be called for all existing devices and all devices which will be detected in 

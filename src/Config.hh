@@ -9,6 +9,7 @@ class Config : public MQTTConfig {
     public:
         Config() = delete;
         Config(int argc, char **argv);
+        virtual ~Config() {};
 
         /**
          * returns the configuration file, which was loaded, if any file was loaded.

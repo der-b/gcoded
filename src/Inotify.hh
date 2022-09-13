@@ -33,7 +33,7 @@ class Inotify {
             return notify;
         }
 
-        ~Inotify();
+        virtual ~Inotify();
 
         void register_listener(const std::string &path, uint32_t event_type, Listener *list);
         void unregister_listener(const std::optional<std::string> path, Listener *list);

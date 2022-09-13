@@ -9,6 +9,7 @@ class MsgDeviceState : public Msg {
     public:
         MsgDeviceState();
         MsgDeviceState(enum Device::State state);
+        virtual ~MsgDeviceState() {};
 
         struct header_msg {
             uint8_t state;

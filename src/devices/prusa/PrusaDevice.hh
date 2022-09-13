@@ -16,7 +16,7 @@ class PrusaDevice : public Device {
         PrusaDevice &operator=(const PrusaDevice &) = delete;
 
         PrusaDevice(const std::string &file, const std::string &name);
-        ~PrusaDevice();
+        virtual ~PrusaDevice();
 
         void onReadedLine(const std::string &readedLine);
 
