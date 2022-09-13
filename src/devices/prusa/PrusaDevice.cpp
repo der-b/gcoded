@@ -27,6 +27,14 @@ const std::regex __full_pos_regex("(" __POS_REGEX "){9}");
 const std::regex __fan_regex(__FAN_REGEX);
 const std::regex __full_fan_regex("(" __FAN_REGEX ")+");
 
+
+// example: NORMAL MODE: Percent done: 0; print time remaining in mins: 24; Change in mins: -1
+// example: SILENT MODE: Percent done: 1; print time remaining in mins: 24; Change in mins: -1
+#define __PROGRESS_REGEX "^NORMAL MODE: Percent done: ([[:digit:]]+); print time remaining in mins: ([[:digit:]]+);.*$"
+const std::regex __progress_regex(__PROGRESS_REGEX);
+
+
+
 /*
  * PrusaDevice()
  */
@@ -81,6 +89,7 @@ void PrusaDevice::initialize()
     m_print_helper = [this](const std::string &line) {
         const std::lock_guard<std::mutex> guard(m_mutex);
         if (m_curr_print.empty()) {
+            update_progress(100, 0);
             set_state(State::OK);
             return;
         }
@@ -171,7 +180,7 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
         return;
     }
     // TODO: make Debug output configurable
-    // std::cout << readed_line.length() << " > " << readed_line << "\n";
+    //std::cout << readed_line.length() << " > " << readed_line << "\n";
     if (readed_line == "start") {
         initialize();
         return;
@@ -229,6 +238,8 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
             parse_pos(readed_line);
         } else if (std::regex_match(readed_line, __full_fan_regex)) {
             parse_fan(readed_line);
+        } else {
+            parse_progress(readed_line);
         }
     }
 }
@@ -458,6 +469,24 @@ void PrusaDevice::parse_fan(const std::string &line)
 
 
 /*
+ * parse_progress()
+ */
+void PrusaDevice::parse_progress(const std::string &line)
+{
+    std::smatch match;
+    // TODO: distinguise between normal mode and silent mode ...
+    if (std::regex_match(line, match, __progress_regex)) {
+        if (match.size() != 3) {
+            throw std::runtime_error("This is unexpected and if it happends, than this is a programming error!");
+        }
+        const unsigned percentage = std::atoi(match[1].str().c_str());
+        const unsigned remaining = std::atoi(match[2].str().c_str());
+        update_progress(percentage, remaining);
+    }
+}
+
+
+/*
  * print_file()
  */
 Device::PrintResult PrusaDevice::print_file(const std::string &file_path)
@@ -558,6 +587,8 @@ void PrusaDevice::start_print()
     
     for (int i = 0; i < 2; ++i) {
         if (m_curr_print.empty()) {
+            update_progress(100, 0);
+            set_state(State::OK);
             return;
         }
         send_command_nl(m_curr_print.front(), nullptr, m_print_helper);

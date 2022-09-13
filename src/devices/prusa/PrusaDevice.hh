@@ -62,6 +62,7 @@ class PrusaDevice : public Device {
         void parse_temp(const std::string &line);
         void parse_pos(const std::string &line);
         void parse_fan(const std::string &line);
+        void parse_progress(const std::string &line);
 
         void start_print();
 
