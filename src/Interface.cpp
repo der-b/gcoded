@@ -2,6 +2,7 @@
 #include "mqtt_messages/MsgDeviceState.hh"
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
+#include "mqtt_messages/MsgPrintProgress.hh"
 
 /*
  * Interface()
@@ -124,4 +125,18 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
         std::string response_topic = prefix + m_conf.mqtt_client_id() + "/" + device + "/print_response";
         m_mqtt.publish(response_topic, response_buf);
     }
+}
+
+
+/*
+ * on_build_progress_change()
+ */
+void Interface::on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time)
+{
+    MsgPrintProgress progress(percentage, remaining_time);
+    std::vector<char> buf;
+    progress.encode(buf);
+    std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + device.name() + "/print_progress";
+    m_mqtt.publish_retained(topic, buf);
+    m_retain_topics.insert(topic);
 }
