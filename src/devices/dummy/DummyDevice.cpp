@@ -46,6 +46,9 @@ Device::PrintResult DummyDevice::print(const std::string &gcode)
         return PrintResult::ERR_INVALID_STATE;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
+    if (!m_curr_print.empty()) {
+        return PrintResult::ERR_PRINTING;
+    }
     std::istringstream gcode_stream(gcode);
 
     auto trim = [](std::string &s) {
