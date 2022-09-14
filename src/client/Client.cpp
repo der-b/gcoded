@@ -5,6 +5,7 @@
 #include "mqtt_messages/MsgDeviceState.hh"
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
+#include "mqtt_messages/MsgPrintProgress.hh"
 
 /*
  * Client()
@@ -39,7 +40,9 @@ Client::Client(const ConfigGcode &conf)
                              "( "
                              "provider TEXT, "
                              "device TEXT, "
-                             "state INTEGER, "
+                             "state INTEGER DEFAULT 0, "
+                             "print_percentage INTEGER DEFAULT 0, "
+                             "print_remaining_time INTEGER DEFAULT 0, "
                              "PRIMARY KEY (provider, device)"
                              ")";
 
@@ -74,8 +77,10 @@ Client::Client(const ConfigGcode &conf)
 
     std::string state_topic = conf.mqtt_prefix() + "/clients/+/+/state";
     std::string print_topic = conf.mqtt_prefix() + "/clients/+/+/print_response";
+    std::string print_progress_topic = conf.mqtt_prefix() + "/clients/+/+/print_progress";
     m_mqtt.subscribe(state_topic);
     m_mqtt.subscribe(print_topic);
+    m_mqtt.subscribe(print_progress_topic);
 
     m_mqtt.start();
 
@@ -124,6 +129,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
     const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
     const std::string state_postfix = "/state";
     const std::string print_postfix = "/print_response";
+    const std::string print_progress_postfix = "/print_progress";
 
     ssize_t res;
     if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
@@ -229,6 +235,85 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
         m_print_callbacks.erase(iter);
         return;
 
+    } else if (   0 <= std::strlen(topic) - print_progress_postfix.size()
+               && 0 == print_progress_postfix.compare(0, print_progress_postfix.size(), topic + std::strlen(topic) - print_progress_postfix.size())) {
+        const char *first = topic + prefix.size();
+        const char *last = topic + std::strlen(topic) - print_progress_postfix.size();
+        const char *pos = std::find(first, last, '/');
+        if (pos >= last) {
+            std::cerr << "Unexpected topic format: " << topic << "\n";
+            return;
+        }
+        const std::string provider(first, pos);
+        const std::string device(pos+1, last);
+
+        const std::vector<char> msg_buf(payload, payload + payload_len);
+        MsgPrintProgress msg_progress;
+        msg_progress.decode(msg_buf);
+
+        sqlite3_stmt *stmt;
+        std::string s_stmt = "INSERT INTO devices (provider, device, print_percentage, print_remaining_time) VALUES (?1, ?2, ?3, ?4) "
+                             "ON CONFLICT DO UPDATE SET print_percentage = ?3, print_remaining_time = ?4";
+        int ret = sqlite3_prepare_v2(m_db,
+                                     s_stmt.data(),
+                                     s_stmt.size(),
+                                     &stmt,
+                                     NULL);
+        if (SQLITE_OK != ret) {
+            sqlite3_finalize(stmt);
+            std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+            err += sqlite3_errmsg(m_db);
+            throw std::runtime_error(err);
+        }
+
+        ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+        if (SQLITE_OK != ret) {
+            sqlite3_finalize(stmt);
+            std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+            err += sqlite3_errmsg(m_db);
+            throw std::runtime_error(err);
+        }
+
+        ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
+        if (SQLITE_OK != ret) {
+            sqlite3_finalize(stmt);
+            std::string err = "Client::on_message(): Failed to bind device parameter: ";
+            err += sqlite3_errmsg(m_db);
+            throw std::runtime_error(err);
+        }
+
+        ret = sqlite3_bind_int(stmt, 3, msg_progress.percentage());
+        if (SQLITE_OK != ret) {
+            sqlite3_finalize(stmt);
+            std::string err = "Client::on_message(): Failed to bind print_percentage parameter: ";
+            err += sqlite3_errmsg(m_db);
+            throw std::runtime_error(err);
+        }
+
+        ret = sqlite3_bind_int(stmt, 4, msg_progress.remaining_time());
+        if (SQLITE_OK != ret) {
+            sqlite3_finalize(stmt);
+            std::string err = "Client::on_message(): Failed to bind print_remaining_time parameter: ";
+            err += sqlite3_errmsg(m_db);
+            throw std::runtime_error(err);
+        }
+        ret = sqlite3_step(stmt);
+        if (SQLITE_CONSTRAINT == ret) {
+            std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+            err += sqlite3_errmsg(m_db);
+            sqlite3_finalize(stmt);
+            throw std::runtime_error(err);
+        }
+
+        if (SQLITE_DONE != ret) {
+            std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+            err += sqlite3_errmsg(m_db);
+            sqlite3_finalize(stmt);
+            throw std::runtime_error(err);
+        }
+
+        sqlite3_finalize(stmt);
+
     } else {
         std::cerr << "Unexpected mqtt topic postfix: " << topic << "\n";
         return;
@@ -247,7 +332,7 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
 
     std::pair<std::string, std::string> sql_hints = convert_hint(hint);
 
-    std::string s_stmt =  "SELECT provider, device, state FROM devices WHERE device LIKE '"
+    std::string s_stmt =  "SELECT provider, device, state, print_percentage, print_remaining_time FROM devices WHERE device LIKE '"
                         + sql_hints.second
                         + "' ESCAPE '\\' AND provider LIKE '"
                         + sql_hints.first
@@ -268,6 +353,8 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
         devices->back().provider = (const char *)sqlite3_column_text(stmt, 0);
         devices->back().name = (const char *)sqlite3_column_text(stmt, 1);
         devices->back().state = (Device::State)sqlite3_column_int(stmt, 2);
+        devices->back().print_percentage = sqlite3_column_int(stmt, 3);
+        devices->back().print_remaining_time = sqlite3_column_int(stmt, 4);
     }
 
     return devices;

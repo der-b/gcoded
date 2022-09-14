@@ -111,7 +111,15 @@ int main(int argc, char **argv)
         std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices(hint);
 
         for (const auto &dev: *devices) {
-            std::cout << dev.provider << "/" << dev.name << " " << Device::state_to_str(dev.state) << "\n";
+            std::cout << dev.provider << "/" << dev.name << " " << Device::state_to_str(dev.state);
+            if (dev.state == Device::State::PRINTING) {
+                int hours = dev.print_remaining_time / 60;
+                int min = dev.print_remaining_time % 60;
+                std::cout << " (" << (int)dev.print_percentage << "%, remaining ";
+                std::cout << std::setw(2) << std::setfill('0') << hours << ":";
+                std::cout << std::setw(2) << std::setfill('0') << min << " [hh:mm])";
+            }
+            std::cout << "\n";
         }
     } else if ("send" == *conf.command()) {
         return send(client, conf);
