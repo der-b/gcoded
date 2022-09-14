@@ -71,7 +71,8 @@ class Device {
                 virtual void on_state_change(Device &device, enum State new_state) = 0;
 
                 /**
-                 * If the device is printing, this method is called when gcode M73 is transmitted to the pritner.
+                 * If the device is printing, this method is called when the gcoded receives a respnse on the
+                 * G-code M73 from the pritner.
                  * See: https://www.reprap.org/wiki/G-code#M73:_Set.2FGet_build_percentage
                  *
                  * The unit of remaining_time is minutes.
