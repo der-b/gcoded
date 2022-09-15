@@ -77,38 +77,25 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
  */
 void Interface::on_message(const char *topic, const char *payload, size_t payload_len)
 {
-    // TODO: The client ID is already known, therefore the logic here can be simplified
-    const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
+    const std::string prefix = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/";
     const std::string print_postfix = "/print_request";
-    
+
     ssize_t res;
     if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
         std::cerr << "Unexpected mqtt topic prefix\n";
         return;
     }
 
-
     if (   0 <= std::strlen(topic) - print_postfix.size()
         && 0 == print_postfix.compare(0, print_postfix.size(), topic + std::strlen(topic) - print_postfix.size())) {
 
         const char *first = topic + prefix.size();
         const char *last = topic + std::strlen(topic) - print_postfix.size();
-        const char *pos = std::find(first, last, '/');
-        if (pos >= last) {
-            std::cerr << "Unexpected topic format: " << topic << "\n";
-            return;
-        }
-        const std::string provider(first, pos);
-        const std::string device(pos+1, last);
+        const std::string device(first, last);
 
         const std::vector<char> msg_buf(payload, payload + payload_len);
         MsgPrint print_msg;
         print_msg.decode(msg_buf);
-
-        // std::cout << "Got MQTT message on topic: " << topic << "\n";
-        // std::cout << "part2: " << std::hex << std::setfill('0') << std::setw(16) << print_msg.request_code_part1() << "\n";
-        // std::cout << "part1: " << std::hex << std::setfill('0') << std::setw(16) << print_msg.request_code_part2() << "\n";
-        // std::cout << "size : " << std::dec << print_msg.gcode().size() << "\n";
 
         Device::PrintResult result = Device::PrintResult::NET_ERR_NO_DEVICE;
         Detector &detector = Detector::get(m_conf);
@@ -122,7 +109,7 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
         MsgPrintResponse response_msg(print_msg, result);
         std::vector<char> response_buf;
         response_msg.encode(response_buf);
-        std::string response_topic = prefix + m_conf.mqtt_client_id() + "/" + device + "/print_response";
+        std::string response_topic = prefix + device + "/print_response";
         m_mqtt.publish(response_topic, response_buf);
     }
 }
