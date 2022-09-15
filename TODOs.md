@@ -3,8 +3,6 @@ TODO: Implementing aliasing
 
 TODO: Transmit sensor readings of the devices via MQTT
 
-TODO: Report print progress via MQTT
-
 TODO: Implement authentication for MQTT
       - Certificates
       - Passwords
