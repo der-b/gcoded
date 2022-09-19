@@ -32,12 +32,22 @@ class Device {
             DISCONNECTED = 5,
             // Connected to device and waiting for device boot.
             INIT_DEVICE = 6,
+            // Device is disabled and removed by calling Device::shutdown().
+            SHUTDOWN = 7,
             __LAST_ENTRY
         };
 
         static const std::string &state_to_str(enum State state)
         {
-            static const std::string states[] = { "UNINITIALIZED", "BUSY", "OK", "PRINTING", "ERROR", "DISCONNECTED", "INIT_DEVICE", "<UNKNOWN_STATE>" };
+            static const std::string states[] = { "UNINITIALIZED",
+                                                  "BUSY",
+                                                  "OK",
+                                                  "PRINTING",
+                                                  "ERROR",
+                                                  "DISCONNECTED",
+                                                  "INIT_DEVICE",
+                                                  "SHUTDOWN",
+                                                  "<UNKNOWN_STATE>" };
             if (state > State::__LAST_ENTRY) {
                 state = State::__LAST_ENTRY;
             }
@@ -96,7 +106,13 @@ class Device {
         }
 
         bool is_valid() const {
-            return m_state != State::ERROR && m_state != State::DISCONNECTED;
+            return    m_state != State::ERROR
+                   && m_state != State::DISCONNECTED
+                   && m_state != State::SHUTDOWN;
+        }
+
+        void shutdown() {
+            set_state(State::SHUTDOWN);
         }
 
         /*
@@ -140,7 +156,7 @@ class Device {
             : m_state(State::UNINITIALIZED)
         { }
 
-        void set_state(enum State new_state)
+        virtual void set_state(enum State new_state)
         {
             const std::lock_guard<std::mutex> guard(m_mutex);
             m_state = new_state;

@@ -191,8 +191,7 @@ void PrusaDetector::on_fs_event(const std::string &path, uint32_t event_type, co
  */
 void PrusaDetector::on_state_change(Device &device, enum Device::State new_state)
 {
-    if (   new_state != Device::State::ERROR
-        && new_state != Device::State::DISCONNECTED) {
+    if (device.is_valid()) {
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);

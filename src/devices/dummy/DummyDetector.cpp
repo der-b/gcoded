@@ -49,8 +49,7 @@ void DummyDetector::register_on_new_device(Listener *list)
 void DummyDetector::on_state_change(Device &device, enum Device::State new_state)
 {
     std::cout << "DummyDetector::" << __func__ << "()\n";
-    if (   new_state != Device::State::ERROR
-        && new_state != Device::State::DISCONNECTED) {
+    if (device.is_valid()) {
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);

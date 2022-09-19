@@ -26,6 +26,8 @@ class PrusaDevice : public Device {
         {
             return m_name;
         }
+    protected:
+        virtual void set_state(enum State new_state) override;
 
     private:
         /**
@@ -68,12 +70,11 @@ class PrusaDevice : public Device {
 
     public:
         struct read_helper {
-            std::function<void(enum State)> error;
+            std::function<void(enum State)> set_state;
             PrusaDevice *pd;
         };
 
     private:
-        void error(enum State state);
 
         struct send_buf {
             std::string line;

@@ -21,9 +21,17 @@ Detector::Detector(const Config &conf)
  */
 Detector::~Detector()
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
-    for (auto &dev: m_devices) {
-        dev->unregister_listener(this);
+    std::list<std::shared_ptr<Device>> local_devices;
+    {
+        const std::lock_guard<std::mutex> guard(m_mutex);
+        for (const auto &dev: m_devices) {
+            local_devices.push_back(dev);
+        }
+    }
+
+    while (!local_devices.empty()) {
+        local_devices.front()->shutdown();
+        local_devices.pop_front();
     }
 }
 
@@ -46,6 +54,7 @@ void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device)
         device->m_on_listener_unregister = [this, name](size_t count) {
             if (count == 0) {
                 std::cout << "Remove Prusa Device: " << name << "\n";
+                const std::lock_guard<std::mutex> guard(m_mutex);
                 m_devices.remove_if([this, name](const std::shared_ptr<Device> &dev) {
                     if (dev->name() == name) {
                         return true;
@@ -81,8 +90,7 @@ void Detector::on_new_dummy_device(const std::shared_ptr<Device> &device)
  */
 void Detector::on_state_change(Device &device, enum Device::State new_state)
 {
-    if (   new_state != Device::State::ERROR
-        && new_state != Device::State::DISCONNECTED) {
+    if (device.is_valid()) {
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);

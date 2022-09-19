@@ -28,9 +28,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    Detector &detec = Detector::get(conf);
     Interface interface(conf);
     Inotify &bla = Inotify::get();
-    Detector &detec = Detector::get(conf);
 
     while(running) {
         sleep(1);

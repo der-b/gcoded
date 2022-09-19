@@ -68,7 +68,7 @@ PrusaDevice::~PrusaDevice()
 /*
  * initialize()
  */
-void PrusaDevice::initialize() 
+void PrusaDevice::initialize()
 {
     if (!is_valid()) {
         return;
@@ -102,7 +102,7 @@ void PrusaDevice::initialize()
         if (EBUSY == errno) {
             set_state(State::BUSY);
         } else {
-            error(State::ERROR);
+            set_state(State::ERROR);
         }
         return;
     }
@@ -115,7 +115,7 @@ void PrusaDevice::initialize()
     if (0 != tcgetattr(m_fd, &tty)) {
         close(m_fd);
         m_fd = -1;
-        error(State::ERROR);
+        set_state(State::ERROR);
         return;
     }
 
@@ -134,12 +134,12 @@ void PrusaDevice::initialize()
     tty.c_cflag &= ~CRTSCTS;
 
     if (0 != tcsetattr(m_fd, TCSANOW, &tty)) {
-        error(State::ERROR);
+        set_state(State::ERROR);
         return;
     }
 
     m_read_helper.pd = this;
-    m_read_helper.error = [this](enum State state){ error(state); };
+    m_read_helper.set_state = [this](enum State state){ set_state(state); };
 
     // this have to be the last call in this function!
     m_ev.register_read_cb(m_fd, [](int fd, void *arg) -> bool {
@@ -156,14 +156,14 @@ void PrusaDevice::initialize()
             }
 
             if (0 == n) {
-                rh->error(State::DISCONNECTED);
+                rh->set_state(State::DISCONNECTED);
                 return false;
             }
 
             if (errno != EAGAIN) {
                 std::cerr << "Error while reading from fd: " << strerror(errno) << "\n";
                 std::cerr << "fd: " << fd << "\n";
-                rh->error(State::ERROR);
+                rh->set_state(State::ERROR);
                 return false;
             }
             return true;
@@ -222,7 +222,7 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
 
     if (state() == State::INIT_DEVICE) {
         switch(m_pstate) {
-            case DEVICE_NOT_READY: 
+            case DEVICE_NOT_READY:
                 if (readed_line == "LCD status changed") {
                     const std::lock_guard<std::mutex> guard(m_mutex);
                     change_pstate(DEVICE_ACCEPTS_COMMANDS);
@@ -255,11 +255,11 @@ void PrusaDevice::change_pstate(enum prusa_state pstate)
     }
     enum prusa_state old_pstate = m_pstate;
     m_pstate = pstate;
-    
+
     switch (m_pstate) {
         case DEVICE_ACCEPTS_COMMANDS:
             send_command_nl("M115",
-                            [this](const std::string &read_line) { 
+                            [this](const std::string &read_line) {
                                 if (0 != read_line.compare(0, 4, "Cap:")) {
                                     return;
                                 }
@@ -273,7 +273,7 @@ void PrusaDevice::change_pstate(enum prusa_state pstate)
                                 const std::lock_guard<std::mutex> guard(m_mutex);
                                 m_capabilities.push_back(read_line.substr(4, second_colon-4));
                             },
-                            [this](const std::string &bla){ 
+                            [this](const std::string &bla){
                                 unsigned int bitmap = 0;
                                 {
                                     const std::lock_guard<std::mutex> guard(m_mutex);
@@ -345,7 +345,7 @@ void PrusaDevice::send_command_nl(const std::string &command,
                 && errno != EAGAIN) {
                 return false;
             }
-            
+
             if (sb_helper->send_lines.empty()) {
                 return false;
             }
@@ -376,7 +376,7 @@ void PrusaDevice::parse_temp(const std::string &line)
         if (std::string::npos != slash_pos) {
             readings.set_point = std::stod(m[0].str().substr(slash_pos+1));
         }
-        
+
         const std::lock_guard<std::mutex> guard(m_mutex);
         if ("T" == type) {
             m_sensor_readings["temp_extruder"] = readings;
@@ -584,7 +584,7 @@ void PrusaDevice::start_print()
     }
 
     set_state(State::PRINTING);
-    
+
     for (int i = 0; i < 2; ++i) {
         if (m_curr_print.empty()) {
             update_progress(100, 0);
@@ -598,15 +598,15 @@ void PrusaDevice::start_print()
 
 
 /*
- * error()
+ * set_state()
  */
-void PrusaDevice::error(enum State state) 
+void PrusaDevice::set_state(enum State state)
 {
     if (state == this->state()) {
         return;
     }
-    set_state(state);
-    if (0 <= m_fd) {
+    Device::set_state(state);
+    if (!is_valid() && 0 <= m_fd) {
         m_ev.unregister_read_cb(m_fd);
         m_ev.unregister_write_cb(m_fd);
         close(m_fd);
