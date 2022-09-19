@@ -54,6 +54,7 @@ void DummyDetector::on_state_change(Device &device, enum Device::State new_state
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
+    device.unregister_listener(this);
     m_devices.remove_if([&device, this](const std::shared_ptr<Device> &dev) {
             if (dev->name() == device.name()) {
                 return true;

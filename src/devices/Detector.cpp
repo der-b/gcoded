@@ -35,13 +35,25 @@ void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "New prusa device: " << device->name() << "\n";
-    device->register_listener(this);
 
     if (device->is_valid()) {
+        device->register_listener(this);
         m_devices.push_back(device);
         for (auto &listener: m_listeners) {
             listener->on_new_device(device);
         }
+        std::string name = device->name();
+        device->m_on_listener_unregister = [this, name](size_t count) {
+            if (count == 0) {
+                std::cout << "Remove Prusa Device: " << name << "\n";
+                m_devices.remove_if([this, name](const std::shared_ptr<Device> &dev) {
+                    if (dev->name() == name) {
+                        return true;
+                    }
+                    return false;
+                });
+            }
+        };
     }
 }
 
@@ -65,7 +77,7 @@ void Detector::on_new_dummy_device(const std::shared_ptr<Device> &device)
 
 
 /*
- * on_stat_change()
+ * on_state_change()
  */
 void Detector::on_state_change(Device &device, enum Device::State new_state)
 {
@@ -74,13 +86,7 @@ void Detector::on_state_change(Device &device, enum Device::State new_state)
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
-    std::cout << "Remove Prusa Device: " << device.name() << "\n";
-    m_devices.remove_if([&device, this](const std::shared_ptr<Device> &dev) {
-            if (dev->name() == device.name()) {
-                return true;
-            }
-            return false;
-        });
+    device.unregister_listener(this);
 }
 
 /*

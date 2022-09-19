@@ -5,9 +5,12 @@
 #include <string>
 #include <functional>
 #include <set>
+#include <queue>
 #include <stdexcept>
 #include <mutex>
 #include <thread>
+
+class Detector;
 
 /**
  * This is an abstract representation of a device which accepts gcode for 
@@ -113,46 +116,94 @@ class Device {
 
         void register_listener(Listener *list)
         {
-            const std::lock_guard<std::recursive_mutex> guard(m_mutex);
-            m_listeners.insert(list);
+            {
+                const std::lock_guard<std::mutex> guard(m_mutex);
+                m_listeners.insert(list);
+            }
+            try_clean_up_listeners();
         }
 
         void unregister_listener(Listener *list)
         {
-            const std::lock_guard<std::recursive_mutex> guard(m_mutex);
-            m_listeners.erase(list);
+            {
+                const std::lock_guard<std::mutex> guard(m_unregister_mutex);
+                m_unregister_listeners.push(list);
+            }
+            try_clean_up_listeners();
         }
 
-        virtual ~Device() {};
+        virtual ~Device()
+        { }
 
     protected:
         Device()
             : m_state(State::UNINITIALIZED)
-        {};
+        { }
 
         void set_state(enum State new_state)
         {
-            const std::lock_guard<std::recursive_mutex> guard(m_mutex);
+            const std::lock_guard<std::mutex> guard(m_mutex);
             m_state = new_state;
             for (auto const &list: m_listeners) {
                 // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
                 // TODO: Uncouple this, so that the callbacks runs on a normal thread
                 list->on_state_change(*this, m_state);
             }
+            clean_up_listeners();
         }
 
         void update_progress(unsigned percentage, unsigned remaining_time) {
-            const std::lock_guard<std::recursive_mutex> guard(m_mutex);
+            const std::lock_guard<std::mutex> guard(m_mutex);
             for (auto const &list: m_listeners) {
                 // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
                 // TODO: Uncouple this, so that the callbacks runs on a normal thread
                 list->on_build_progress_change(*this, percentage, remaining_time);
             }
+            clean_up_listeners();
         }
+
     private:
-        std::recursive_mutex m_mutex;
+        void try_clean_up_listeners() {
+            if (m_mutex.try_lock()) {
+                try {
+                    clean_up_listeners();
+                } catch(...) {
+                    m_mutex.unlock();
+                    std::exception_ptr eptr = std::current_exception(); // capture
+                    try {
+                        std::rethrow_exception(eptr);
+                    } catch(const std::exception& e) {
+                        std::string error = "Caught exception: \"";
+                        error += e.what();
+                        error += "\"\n";
+                        throw std::runtime_error(error);
+                    }
+                }
+                m_mutex.unlock();
+            }
+        }
+
+        // WARNING: This fuction assumes, that m_mutex is already locked
+        void clean_up_listeners() {
+            const std::lock_guard<std::mutex> guard(m_unregister_mutex);
+            while (!m_unregister_listeners.empty()) {
+                m_listeners.erase(m_unregister_listeners.front());
+                m_unregister_listeners.pop();
+            }
+            if (m_on_listener_unregister) {
+                m_on_listener_unregister(m_listeners.size());
+            }
+        }
+
+        std::mutex m_mutex;
         State m_state;
         std::set<Listener *> m_listeners;
+        std::function<void(size_t)> m_on_listener_unregister;
+
+        std::mutex m_unregister_mutex;
+        std::queue<Listener *> m_unregister_listeners;
+
+        friend Detector;
 };
 
 #endif

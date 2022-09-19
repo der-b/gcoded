@@ -138,8 +138,7 @@ void PrusaDetector::check_candidate(const std::string &filename)
 
             new_dev->register_listener(this);
 
-            if (   new_dev->state() != Device::State::ERROR
-                && new_dev->state() != Device::State::DISCONNECTED) {
+            if (new_dev->is_valid()) {
                 m_devices.push_back(new_dev);
                 for (auto &listener: m_listeners) {
                     listener->on_new_prusa_device(new_dev);
@@ -197,6 +196,7 @@ void PrusaDetector::on_state_change(Device &device, enum Device::State new_state
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
+    device.unregister_listener(this);
     m_devices.remove_if([&device, this](const std::shared_ptr<Device> &dev) {
             if (dev->name() == device.name()) {
                 return true;

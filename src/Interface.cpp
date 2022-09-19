@@ -70,6 +70,9 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
         m_mqtt.publish_retained(topic, buf);
         m_retain_topics.insert(topic);
     }
+    if (!dev.is_valid()) {
+        dev.unregister_listener(this);
+    }
 }
 
 /*
