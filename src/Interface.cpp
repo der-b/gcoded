@@ -63,8 +63,11 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
     MsgDeviceState msg_state(new_state);
     msg_state.encode(buf);
     if (Device::State::DISCONNECTED == new_state) {
+        std::string topic_pp = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + dev.name() + "/print_progress";
         m_mqtt.publish_retained(topic.c_str(), NULL, 0);
+        m_mqtt.publish_retained(topic_pp.c_str(), NULL, 0);
         m_retain_topics.erase(topic);
+        m_retain_topics.erase(topic_pp);
         m_mqtt.publish(topic, buf);
     } else {
         m_mqtt.publish_retained(topic, buf);
