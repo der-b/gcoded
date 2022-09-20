@@ -58,6 +58,14 @@ class ConfigGcode : public MQTTConfig {
 
 
         /**
+         * if true, prints debug output
+         */
+        const bool verbose() const {
+            return m_verbose;
+        }
+
+
+        /**
          * returns the usage string.
          */
         const char *usage() const;
@@ -115,6 +123,7 @@ class ConfigGcode : public MQTTConfig {
         std::string m_mqtt_client_id;
         bool m_load_dummy;
         bool m_print_help;
+        bool m_verbose;
         std::optional<std::string> m_command;
         std::vector<std::string> m_command_args;
 };
