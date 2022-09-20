@@ -78,6 +78,13 @@ class Config : public MQTTConfig {
             return m_print_help;
         }
 
+        /**
+         * if true, prints debug output
+         */
+        const bool verbose() const {
+            return m_verbose;
+        }
+
 
         /**
          * returns the usage string.
@@ -133,6 +140,7 @@ class Config : public MQTTConfig {
         std::string m_mqtt_prefix;
         bool m_load_dummy;
         bool m_print_help;
+        bool m_verbose;
 };
 
 std::ostream& operator<<(std::ostream& out, const Config &conf);

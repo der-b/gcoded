@@ -12,11 +12,12 @@ const struct option long_options_config[] = {
     { "mqtt-port",   required_argument, 0, 'p' },
     { "mqtt-prefix", required_argument, 0, 'e' },
     { "load-dummy",  no_argument,       0, 0 },
+    { "verbose",     no_argument,       0, 'v' },
     { "help",        no_argument,       0, 'h' },
     { 0, 0, 0, 0 }
 };
 
-const char short_options_config[] = "-c:b:p:e:h";
+const char short_options_config[] = "-c:b:p:e:vh";
 
 const char usage_message[] = "gcoded [OPTIONS]\n";
 const char help_message[] = 
@@ -29,6 +30,7 @@ const char help_message[] =
 "-p, --mqtt-port=port         Port of the MQTT broker.\n"
 "-e, --mqtt-prefix=prefix     MQTT topic under which gcoded will expose the interface.\n"
 "    --load-dummy             Load dummy devices for debugging.\n"
+"-v, --verbose                Enable debug output.\n"
 "-h, --help                   Print help message and config.\n";
 
 
@@ -82,6 +84,7 @@ void Config::set_default()
     m_mqtt_prefix = "gcoded";
     m_load_dummy = false;
     m_print_help = false;
+    m_verbose = false;
 }
 
 
@@ -342,6 +345,9 @@ void Config::parse_args(int argc, char **argv)
             case 'h':
                 m_print_help = true;
                 break;
+            case 'v':
+                m_verbose = true;
+                break;
             case '?':
             default:
                 std::string err = "Unknown option: '";
@@ -398,5 +404,6 @@ std::ostream& operator<<(std::ostream& out, const Config &conf)
     out << "mqtt_port: " << conf.mqtt_port() << "\n";
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
     out << "load_dummy: " << ((conf.load_dummy())?("true"):("false")) << "\n";
+    out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;
 }
