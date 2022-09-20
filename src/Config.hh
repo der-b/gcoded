@@ -81,7 +81,7 @@ class Config : public MQTTConfig {
         /**
          * if true, prints debug output
          */
-        const bool verbose() const {
+        virtual const bool verbose() const override {
             return m_verbose;
         }
 

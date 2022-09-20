@@ -157,8 +157,9 @@ void MQTT::stop()
 void MQTT::publish(const char *topic, const char *payload, size_t payload_length)
 {
     if (MOSQ_ERR_SUCCESS != mosquitto_publish(m_cb_data.mosq, NULL, topic, payload_length, payload, 0, false)) {
-        // ignore return value
-        // TODO: enable debugging output
+        if (m_cb_data.conf.verbose()) {
+            std::cout << "MQTT: Failed to publish message on topic: " << topic << "\n";
+        }
     }
 }
 
@@ -169,8 +170,9 @@ void MQTT::publish(const char *topic, const char *payload, size_t payload_length
 void MQTT::publish_retained(const char *topic, const char *payload, size_t payload_length)
 {
     if (MOSQ_ERR_SUCCESS != mosquitto_publish(m_cb_data.mosq, NULL, topic, payload_length, payload, 0, true)) {
-        // ignore return value
-        // TODO: enable debugging output
+        if (m_cb_data.conf.verbose()) {
+            std::cout << "MQTT: Failed to publish retained message on topic: " << topic << "\n";
+        }
     }
 }
 
