@@ -6,6 +6,7 @@
 #include <mutex>
 #include <functional>
 #include <list>
+#include "../../Config.hh"
 #include "../../EventLoop.hh"
 
 class PrusaDevice : public Device {
@@ -15,7 +16,7 @@ class PrusaDevice : public Device {
         PrusaDevice(PrusaDevice &&) = delete;
         PrusaDevice &operator=(const PrusaDevice &) = delete;
 
-        PrusaDevice(const std::string &file, const std::string &name);
+        PrusaDevice(const std::string &file, const std::string &name, const Config &conf);
         virtual ~PrusaDevice();
 
         void onReadedLine(const std::string &readedLine);
@@ -115,6 +116,7 @@ class PrusaDevice : public Device {
         std::list<std::string> m_curr_print;
         std::function<void(const std::string &line)> m_print_helper;
         struct read_helper m_read_helper;
+        const Config &m_conf;
 };
 
 #endif

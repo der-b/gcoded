@@ -38,14 +38,15 @@ const std::regex __progress_regex(__PROGRESS_REGEX);
 /*
  * PrusaDevice()
  */
-PrusaDevice::PrusaDevice(const std::string &file, const std::string &name)
+PrusaDevice::PrusaDevice(const std::string &file, const std::string &name, const Config &conf)
     : m_device(file),
       m_name(name),
       m_ev(EventLoop::get_realtime_event_loop()),
       m_fd(-1),
       m_send_lines(),
       m_sended_lines(),
-      m_send_buf_helper(m_mutex, m_send_lines, m_sended_lines)
+      m_send_buf_helper(m_mutex, m_send_lines, m_sended_lines),
+      m_conf(conf)
 {
     initialize();
 }
@@ -179,8 +180,9 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
     if (!is_valid()) {
         return;
     }
-    // TODO: make Debug output configurable
-    //std::cout << readed_line.length() << " > " << readed_line << "\n";
+    if (m_conf.verbose()) {
+        std::cout << readed_line.length() << " > " << readed_line << "\n";
+    }
     if (readed_line == "start") {
         initialize();
         return;

@@ -4,6 +4,7 @@
 #include "PrusaDevice.hh"
 #include "../Device.hh"
 #include "../../Inotify.hh"
+#include "../../Config.hh"
 #include <mutex>
 #include <set>
 #include <list>
@@ -24,9 +25,9 @@ class PrusaDetector : public Inotify::Listener, public Device::Listener {
          * A detector is implemented as singelton and this method is used
          * to get this singleton.
          */
-        static PrusaDetector &get()
+        static PrusaDetector &get(const Config &conf)
         {
-            static PrusaDetector s;
+            static PrusaDetector s(conf);
             return s;
         }
 
@@ -48,7 +49,7 @@ class PrusaDetector : public Inotify::Listener, public Device::Listener {
         virtual void on_state_change(Device &device, enum Device::State new_state) override;
 
     private:
-        PrusaDetector();
+        PrusaDetector(const Config &conf);
 
         /**
          * Adds detected devices to the device list, if they are not in the list already.
@@ -60,6 +61,7 @@ class PrusaDetector : public Inotify::Listener, public Device::Listener {
         std::mutex m_mutex;
         std::set<Listener *> m_listeners;
         std::list<std::shared_ptr<Device>> m_devices;
+        const Config &m_conf;
 };
 
 #endif

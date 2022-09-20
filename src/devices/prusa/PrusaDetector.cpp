@@ -11,7 +11,8 @@
 /*
  * PrusaDetector()
  */
-PrusaDetector::PrusaDetector()
+PrusaDetector::PrusaDetector(const Config &conf)
+    : m_conf(conf)
 {
     Inotify::get().register_listener("/dev/", Inotify::CREATE | Inotify::ATTRIB, this);
     detect(m_devices);
@@ -134,7 +135,7 @@ void PrusaDetector::check_candidate(const std::string &filename)
             }
             close(fd);
 
-            std::shared_ptr<Device> new_dev = std::make_shared<PrusaDevice>(device_file, device_name);
+            std::shared_ptr<Device> new_dev = std::make_shared<PrusaDevice>(device_file, device_name, m_conf);
 
             new_dev->register_listener(this);
 

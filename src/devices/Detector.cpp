@@ -9,7 +9,7 @@
 Detector::Detector(const Config &conf)
     : m_conf(conf)
 {
-    PrusaDetector::get().register_on_new_device(this);
+    PrusaDetector::get(conf).register_on_new_device(this);
     if (conf.load_dummy()) {
         DummyDetector::get().register_on_new_device(this);
     }
