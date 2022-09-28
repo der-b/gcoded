@@ -11,6 +11,7 @@ bool running = true;
 
 void sig_handler(int)
 {
+    std::cout << "shutdown\n";
     running = false;
 }
 
@@ -36,7 +37,6 @@ int main(int argc, char **argv)
         sleep(1);
     }
 
-    std::cout << "main() end\n";
     return 0;
 }
 
