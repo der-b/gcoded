@@ -35,6 +35,7 @@ Client::Client(const ConfigGcode &conf)
     }
 
     { // create devices table
+      // TODO: Used sqlite3_exec()
         sqlite3_stmt *stmt;
         std::string s_stmt = "CREATE TABLE devices "
                              "( "
