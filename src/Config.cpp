@@ -78,6 +78,7 @@ void Config::set_default()
             m_conf_file.reset();
         }
     }
+    m_aliases_file = "/var/lib/gcoded/aliases";
 
     m_mqtt_broker = "localhost";
     m_mqtt_port = 1883;

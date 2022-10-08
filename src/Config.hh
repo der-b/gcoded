@@ -28,6 +28,14 @@ class Config : public MQTTConfig {
 
 
         /**
+         * returns the filename of the alias database
+         */
+        const std::filesystem::path &aliases_file() const {
+            return m_aliases_file;
+        }
+
+
+        /**
          * returns the client ID used for MQTT.
          * This id is a 128bit random number.
          * This ID is persistent even over reboots. This ID is normally stored in "/var/lib/gcoded/id".
@@ -134,6 +142,7 @@ class Config : public MQTTConfig {
     private:
         std::optional<std::filesystem::path> m_conf_file;
         std::optional<std::filesystem::path> m_id_file;
+        std::filesystem::path m_aliases_file;
         std::string m_mqtt_client_id;
         std::string m_mqtt_broker;
         uint16_t m_mqtt_port;
