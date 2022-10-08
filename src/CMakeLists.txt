@@ -11,6 +11,7 @@ add_executable(gcoded
                MQTT.cpp
                Inotify.cpp
                Interface.cpp
+               Aliases.cpp
                mqtt_messages/MsgDeviceState.cpp
                mqtt_messages/MsgPrint.cpp
                mqtt_messages/MsgPrintResponse.cpp
@@ -22,7 +23,8 @@ target_link_libraries(gcoded
                       event_pthreads
                       pthread
                       stdc++fs
-                      mosquitto)
+                      mosquitto
+                      ${SQLite3_LIBRARY})
 
 add_executable(gcode
                ConfigGcode.cpp
