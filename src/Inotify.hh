@@ -17,6 +17,7 @@ class Inotify {
         static constexpr uint32_t IS_DIR = IN_ISDIR;
         static constexpr uint32_t ATTRIB = IN_ATTRIB;
         static constexpr uint32_t DELETE_SELF = IN_DELETE_SELF;
+        static constexpr uint32_t MODIFY = IN_MODIFY;
 
         class Listener {
             public:
