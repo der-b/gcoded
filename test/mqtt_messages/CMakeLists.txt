@@ -32,3 +32,10 @@ add_executable(test_msg_print_progress EXCLUDE_FROM_ALL
     ../../src/mqtt_messages/MsgType.cpp)
 add_dependencies(check test_msg_print_progress)
 add_test(NAME test_msg_print_progress COMMAND test_msg_print_progress)
+
+add_executable(test_msg_aliases EXCLUDE_FROM_ALL
+    test_msg_aliases.cpp
+    ../../src/mqtt_messages/MsgAliases.cpp
+    ../../src/mqtt_messages/MsgType.cpp)
+add_dependencies(check test_msg_aliases)
+add_test(NAME test_msg_aliases COMMAND test_msg_aliases)

@@ -11,9 +11,10 @@ class MsgType : public Msg {
             PRINT = 2,
             PRINT_RESPONSE = 3,
             PRINT_PROGRESS = 4,
+            ALIASES = 5,
             // this entry needs to be the last element and needs a number which is higher
             // by one compared to the previous enty
-            __LAST_ENTRY = 5
+            __LAST_ENTRY = 6
         };
 
         struct header_msg {
