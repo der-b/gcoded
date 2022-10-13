@@ -3,13 +3,15 @@
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
+#include "mqtt_messages/MsgAliases.hh"
 
 /*
  * Interface()
  */
-Interface::Interface(const Config &conf)
+Interface::Interface(const Config &conf, Aliases &aliases)
     : m_conf(conf),
-      m_mqtt(conf)
+      m_mqtt(conf),
+      m_aliases(aliases)
 {
     //std::cout << "Interface::" << __func__ << "\n";
     {
@@ -20,6 +22,8 @@ Interface::Interface(const Config &conf)
         m_mqtt.start();
     }
     Detector::get(conf).register_on_new_device(this);
+    aliases.register_listener(this);
+    on_alias_change();
 }
 
 /*
@@ -130,6 +134,27 @@ void Interface::on_build_progress_change(Device &device, unsigned percentage, un
     std::vector<char> buf;
     progress.encode(buf);
     std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + device.name() + "/print_progress";
+    m_mqtt.publish_retained(topic, buf);
+    m_retain_topics.insert(topic);
+}
+
+void Interface::on_alias_change()
+{
+    std::map<std::string, std::string> aliases;
+    std::optional<std::string> provider_alias = m_aliases.provider_alias();
+    m_aliases.get_aliases(aliases);
+    MsgAliases msg_aliases;
+
+    if (provider_alias) {
+        msg_aliases.set_provider_alias(*provider_alias);
+    }
+    for (const auto &alias: aliases) {
+        msg_aliases.add_alias(alias.first, alias.second);
+    }
+
+    std::vector<char> buf;
+    msg_aliases.encode(buf);
+    std::string topic = m_conf.mqtt_prefix() + "/aliases/" + m_conf.mqtt_client_id();
     m_mqtt.publish_retained(topic, buf);
     m_retain_topics.insert(topic);
 }

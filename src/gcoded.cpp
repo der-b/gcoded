@@ -4,6 +4,7 @@
 #include "MQTT.hh"
 #include "Interface.hh"
 #include "Inotify.hh"
+#include "Aliases.hh"
 #include <unistd.h>
 #include <signal.h>
 
@@ -30,8 +31,9 @@ int main(int argc, char **argv)
     }
 
     Detector &detec = Detector::get(conf);
-    Interface interface(conf);
     Inotify &bla = Inotify::get();
+    Aliases aliases(conf);
+    Interface interface(conf, aliases);
 
     while(running) {
         sleep(1);
