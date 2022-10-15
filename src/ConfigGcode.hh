@@ -76,6 +76,7 @@ class ConfigGcode : public MQTTConfig {
         const char *help() const;
 
         /**
+         * TODO: Improve documentation
          * command()
          */
         const std::optional<std::string> &command() const {
@@ -83,10 +84,19 @@ class ConfigGcode : public MQTTConfig {
         }
 
         /**
+         * TODO: Improve documentation
          * command_args()
          */
         const std::vector<std::string> &command_args() const {
             return m_command_args;
+        }
+
+        /**
+         * Returns false, if aliases shall not be used and resolved.
+         * That means, the real device names and provider names are used, if it returns false.
+         */
+        bool resolve_aliases() const {
+            return m_resolve_aliases;
         }
 
     private:
@@ -126,6 +136,7 @@ class ConfigGcode : public MQTTConfig {
         bool m_verbose;
         std::optional<std::string> m_command;
         std::vector<std::string> m_command_args;
+        bool m_resolve_aliases;
 };
 
 std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf);

@@ -10,12 +10,13 @@ const struct option long_options_config[] = {
     { "mqtt-broker", required_argument, 0, 'b' },
     { "mqtt-port",   required_argument, 0, 'p' },
     { "mqtt-prefix", required_argument, 0, 'e' },
+    { "real-names",  no_argument,       0, 'r' },
     { "verbose",     no_argument,       0, 'v' },
     { "help",        no_argument,       0, 'h' },
     { 0, 0, 0, 0 }
 };
 
-const char short_options_config[] = "-c:b:p:e:vh";
+const char short_options_config[] = "-c:b:p:e:rvh";
 
 const char usage_message[] = "gcode [OPTIONS] [COMMAND]\n";
 const char help_message[] = 
@@ -26,6 +27,7 @@ const char help_message[] =
 "-b, --mqtt-broker=hostname   Hostname or IP of the MQTT broker.\n"
 "-p, --mqtt-port=port         Port of the MQTT broker.\n"
 "-e, --mqtt-prefix=prefix     MQTT topic under which gcoded will expose the interface.\n"
+"-r, --real-names             Do not use aliases for device and provider. Use real names.\n"
 "-v, --verbose                Enable debug output.\n"
 "-h, --help                   Print help message and configuration.\n"
 "\n"
@@ -120,6 +122,7 @@ void ConfigGcode::set_default()
     m_mqtt_client_id = "";
     m_print_help = false;
     m_verbose = false;
+    m_resolve_aliases = true;
 }
 
 
@@ -322,6 +325,9 @@ void ConfigGcode::parse_args(int argc, char **argv)
             case 'e':
                 m_mqtt_prefix = optarg;
                 break;
+            case 'r':
+                m_resolve_aliases = false;
+                break;
             case 'h':
                 m_print_help = true;
                 break;
@@ -376,6 +382,7 @@ std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
     out << "mqtt_broker: " << conf.mqtt_broker() << "\n";
     out << "mqtt_port: " << conf.mqtt_port() << "\n";
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
+    out << "resolve_aliases: " << ((conf.resolve_aliases())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;
 }

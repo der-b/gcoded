@@ -453,15 +453,20 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
 
     std::pair<std::string, std::string> sql_hints = convert_hint(hint);
 
-    // TODO: implement '-n'
     std::string s_stmt =  "SELECT d.provider, d.device, d.state, d.print_percentage, d.print_remaining_time, d.device_alias, a.alias "
                           "FROM devices AS d "
-                          "LEFT JOIN provider_alias AS a ON d.provider = a.provider "
-                          "WHERE (   d.device_alias LIKE '" + sql_hints.second + "' ESCAPE '\\' "
-                          "       OR (d.device_alias IS NULL AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\'))"
-                          "AND (   a.alias LIKE '" + sql_hints.first + "' ESCAPE '\\' "
-                          "     OR (a.alias IS NULL AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' ))"
-                          "ORDER BY d.device_alias, d.device, a.alias, d.provider;";
+                          "LEFT JOIN provider_alias AS a ON d.provider = a.provider ";
+    if (m_conf.resolve_aliases()) {
+        s_stmt += "WHERE (   d.device_alias LIKE '" + sql_hints.second + "' ESCAPE '\\' "
+                  "       OR (d.device_alias IS NULL AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\')) "
+                  "AND (   a.alias LIKE '" + sql_hints.first + "' ESCAPE '\\' "
+                  "     OR (a.alias IS NULL AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' )) ";
+    } else {
+        s_stmt += "WHERE d.device LIKE '" + sql_hints.second + "' ESCAPE '\\' "
+                  "AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' ";
+    }
+    s_stmt += "ORDER BY d.device_alias, d.device, a.alias, d.provider;";
+
     ret = sqlite3_prepare_v2(m_db,
                              s_stmt.data(),
                              s_stmt.size(),
