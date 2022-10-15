@@ -35,6 +35,7 @@ add_executable(gcode
                mqtt_messages/MsgPrint.cpp
                mqtt_messages/MsgPrintResponse.cpp
                mqtt_messages/MsgPrintProgress.cpp
+               mqtt_messages/MsgAliases.cpp
                mqtt_messages/MsgType.cpp
                gcode.cpp)
 

@@ -15,6 +15,8 @@ class Client : public MQTT::Listener {
         struct DeviceInfo {
             std::string provider;
             std::string name;
+            std::string provider_alias;
+            std::string device_alias;
             Device::State state;
             uint8_t print_percentage;
             uint32_t print_remaining_time;

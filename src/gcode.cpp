@@ -111,7 +111,20 @@ int main(int argc, char **argv)
         std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices(hint);
 
         for (const auto &dev: *devices) {
-            std::cout << dev.provider << "/" << dev.name << " " << Device::state_to_str(dev.state);
+            // TODO: implement '-n'
+            if (dev.provider_alias.size()) {
+                std::cout << dev.provider_alias;
+            } else {
+                std::cout << dev.provider;
+            }
+            std::cout << "/";
+            // TODO: implement '-n'
+            if (dev.device_alias.size()) {
+                std::cout << dev.device_alias;
+            } else {
+                std::cout << dev.name;
+            }
+            std::cout << " " << Device::state_to_str(dev.state);
             if (dev.state == Device::State::PRINTING) {
                 int hours = dev.print_remaining_time / 60;
                 int min = dev.print_remaining_time % 60;

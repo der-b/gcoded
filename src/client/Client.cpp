@@ -6,6 +6,7 @@
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
+#include "mqtt_messages/MsgAliases.hh"
 
 /*
  * Client()
@@ -35,8 +36,6 @@ Client::Client(const ConfigGcode &conf)
     }
 
     { // create devices table
-      // TODO: Used sqlite3_exec()
-        sqlite3_stmt *stmt;
         std::string s_stmt = "CREATE TABLE devices "
                              "( "
                              "provider TEXT, "
@@ -44,34 +43,34 @@ Client::Client(const ConfigGcode &conf)
                              "state INTEGER DEFAULT 0, "
                              "print_percentage INTEGER DEFAULT 0, "
                              "print_remaining_time INTEGER DEFAULT 0, "
+                             "device_alias TEXT DEFAULT NULL, "
                              "PRIMARY KEY (provider, device)"
                              ")";
+        ret = sqlite3_exec(m_db, s_stmt.c_str(), NULL, NULL, NULL);
 
-        int ret = sqlite3_prepare_v2(m_db,
-                                     s_stmt.data(),
-                                     s_stmt.size(),
-                                     &stmt,
-                                     NULL);
         if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::Client(): Failed to prepare create table statement: ";
+            std::string err = "Client::Client(): Failed create table devices: ";
             err += sqlite3_errmsg(m_db);
             sqlite3_close(m_db);
             m_db = nullptr;
             throw std::runtime_error(err);
         }
+    }
 
-        ret = sqlite3_step(stmt);
-        if (SQLITE_DONE != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::Client(): Execution of the create table statment failed: ";
+    { // create provider alias table
+        std::string s_stmt = "CREATE TABLE provider_alias "
+                             "( "
+                             "provider TEXT NOT NULL UNIQUE PRIMARY KEY, "
+                             "alias TEXT)";
+        ret = sqlite3_exec(m_db, s_stmt.c_str(), NULL, NULL, NULL);
+
+        if (SQLITE_OK != ret) {
+            std::string err = "Client::Client(): Failed create table provider_alias: ";
             err += sqlite3_errmsg(m_db);
             sqlite3_close(m_db);
             m_db = nullptr;
             throw std::runtime_error(err);
         }
-
-        sqlite3_finalize(stmt);
     }
 
     m_mqtt.register_listener(this);
@@ -79,9 +78,11 @@ Client::Client(const ConfigGcode &conf)
     std::string state_topic = conf.mqtt_prefix() + "/clients/+/+/state";
     std::string print_topic = conf.mqtt_prefix() + "/clients/+/+/print_response";
     std::string print_progress_topic = conf.mqtt_prefix() + "/clients/+/+/print_progress";
+    std::string aliases_topic = conf.mqtt_prefix() + "/aliases/+";
     m_mqtt.subscribe(state_topic);
     m_mqtt.subscribe(print_topic);
     m_mqtt.subscribe(print_progress_topic);
+    m_mqtt.subscribe(aliases_topic);
 
     m_mqtt.start();
 
@@ -128,36 +129,211 @@ Client::~Client()
 void Client::on_message(const char *topic, const char *payload, size_t payload_len)
 {
     const std::string prefix = m_conf.mqtt_prefix() + "/clients/";
+    const std::string alias_prefix = m_conf.mqtt_prefix() + "/aliases/";
     const std::string state_postfix = "/state";
     const std::string print_postfix = "/print_response";
     const std::string print_progress_postfix = "/print_progress";
 
-    ssize_t res;
-    if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
-        std::cerr << "Unexpected mqtt topic prefix\n";
-        return;
-    }
+    if (0 == prefix.compare(0, prefix.size(), topic, prefix.size())) {
+        if (   0 <= std::strlen(topic) - state_postfix.size()
+            && 0 == state_postfix.compare(0, state_postfix.size(), topic + std::strlen(topic) - state_postfix.size())) {
 
-    if (   0 <= std::strlen(topic) - state_postfix.size()
-        && 0 == state_postfix.compare(0, state_postfix.size(), topic + std::strlen(topic) - state_postfix.size())) {
+            const char *first = topic + prefix.size();
+            const char *last = topic + std::strlen(topic) - state_postfix.size();
+            const char *pos = std::find(first, last, '/');
+            if (pos >= last) {
+                std::cerr << "Unexpected topic format: " << topic << "\n";
+                return;
+            }
+            const std::string provider(first, pos);
+            const std::string device(pos+1, last);
+            const std::vector<char> msg_buf(payload, payload + payload_len);
 
-        const char *first = topic + prefix.size();
-        const char *last = topic + std::strlen(topic) - state_postfix.size();
+            MsgDeviceState msg;
+            msg.decode(msg_buf);
+
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "INSERT INTO devices (provider, device, state) VALUES (?1, ?2, ?3) "
+                                 "ON CONFLICT DO UPDATE SET state = ?3";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind device parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_int(stmt, 3, static_cast<int>(msg.device_state()));
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind state parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+            ret = sqlite3_step(stmt);
+            if (SQLITE_CONSTRAINT == ret) {
+                std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            if (SQLITE_DONE != ret) {
+                std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            sqlite3_finalize(stmt);
+
+        } else if (   0 <= std::strlen(topic) - print_postfix.size()
+                   && 0 == print_postfix.compare(0, print_postfix.size(), topic + std::strlen(topic) - print_postfix.size())) {
+            const char *first = topic + prefix.size();
+            const char *last = topic + std::strlen(topic) - print_postfix.size();
+            const char *pos = std::find(first, last, '/');
+            if (pos >= last) {
+                std::cerr << "Unexpected topic format: " << topic << "\n";
+                return;
+            }
+            const std::string provider(first, pos);
+            const std::string device(pos+1, last);
+
+            const std::vector<char> msg_buf(payload, payload + payload_len);
+            MsgPrintResponse msg_response;
+            msg_response.decode(msg_buf);
+
+            std::pair<uint64_t, uint64_t> key{ msg_response.request_code_part1(), msg_response.request_code_part2() };
+            const std::lock_guard<std::mutex> guard(m_mutex);
+            auto iter = m_print_callbacks.find(key);
+            if (m_print_callbacks.end() == iter) {
+                return;
+            }
+            iter->second.callback(*iter->second.device, msg_response.print_result());
+            m_print_callbacks.erase(iter);
+            return;
+
+        } else if (   0 <= std::strlen(topic) - print_progress_postfix.size()
+                   && 0 == print_progress_postfix.compare(0, print_progress_postfix.size(), topic + std::strlen(topic) - print_progress_postfix.size())) {
+            const char *first = topic + prefix.size();
+            const char *last = topic + std::strlen(topic) - print_progress_postfix.size();
+            const char *pos = std::find(first, last, '/');
+            if (pos >= last) {
+                std::cerr << "Unexpected topic format: " << topic << "\n";
+                return;
+            }
+            const std::string provider(first, pos);
+            const std::string device(pos+1, last);
+
+            const std::vector<char> msg_buf(payload, payload + payload_len);
+            MsgPrintProgress msg_progress;
+            msg_progress.decode(msg_buf);
+
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "INSERT INTO devices (provider, device, print_percentage, print_remaining_time) VALUES (?1, ?2, ?3, ?4) "
+                                 "ON CONFLICT DO UPDATE SET print_percentage = ?3, print_remaining_time = ?4";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind device parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_int(stmt, 3, msg_progress.percentage());
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind print_percentage parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_int(stmt, 4, msg_progress.remaining_time());
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind print_remaining_time parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+            ret = sqlite3_step(stmt);
+            if (SQLITE_CONSTRAINT == ret) {
+                std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            if (SQLITE_DONE != ret) {
+                std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            sqlite3_finalize(stmt);
+
+
+        } else {
+            std::cerr << "Unexpected mqtt topic postfix: " << topic << "\n";
+            return;
+        }
+    } else if (0 == alias_prefix.compare(0, alias_prefix.size(), topic, alias_prefix.size())) {
+        const char *first = topic + alias_prefix.size();
+        const char *last = topic + std::strlen(topic);
         const char *pos = std::find(first, last, '/');
-        if (pos >= last) {
+        if (pos != last) {
             std::cerr << "Unexpected topic format: " << topic << "\n";
             return;
         }
-        const std::string provider(first, pos);
-        const std::string device(pos+1, last);
-        const std::vector<char> msg_buf(payload, payload + payload_len);
+        const std::string provider(first, last);
 
-        MsgDeviceState msg;
-        msg.decode(msg_buf);
+        const std::vector<char> msg_buf(payload, payload + payload_len);
+        MsgAliases msg_aliases;
+        msg_aliases.decode(msg_buf);
 
         sqlite3_stmt *stmt;
-        std::string s_stmt = "INSERT INTO devices (provider, device, state) VALUES (?1, ?2, ?3) "
-                             "ON CONFLICT DO UPDATE SET state = ?3";
+        std::string s_stmt = "INSERT INTO provider_alias (provider, alias) VALUES (?1, ?2) "
+                             "ON CONFLICT DO UPDATE SET alias = ?2";
         int ret = sqlite3_prepare_v2(m_db,
                                      s_stmt.data(),
                                      s_stmt.size(),
@@ -178,18 +354,10 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
             throw std::runtime_error(err);
         }
 
-        ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
+        ret = sqlite3_bind_text(stmt, 2, msg_aliases.provider_alias().data(), msg_aliases.provider_alias().size(), NULL);
         if (SQLITE_OK != ret) {
             sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind device parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-
-        ret = sqlite3_bind_int(stmt, 3, static_cast<int>(msg.device_state()));
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind state parameter: ";
+            std::string err = "Client::on_message(): Failed to bind alias parameter: ";
             err += sqlite3_errmsg(m_db);
             throw std::runtime_error(err);
         }
@@ -210,113 +378,65 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 
         sqlite3_finalize(stmt);
 
-    } else if (   0 <= std::strlen(topic) - print_postfix.size()
-               && 0 == print_postfix.compare(0, print_postfix.size(), topic + std::strlen(topic) - print_postfix.size())) {
-        const char *first = topic + prefix.size();
-        const char *last = topic + std::strlen(topic) - print_postfix.size();
-        const char *pos = std::find(first, last, '/');
-        if (pos >= last) {
-            std::cerr << "Unexpected topic format: " << topic << "\n";
-            return;
-        }
-        const std::string provider(first, pos);
-        const std::string device(pos+1, last);
+        for (const auto &alias: msg_aliases.aliases()) {
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "INSERT INTO devices (provider, device, device_alias) VALUES (?1, ?2, ?3) "
+                                 "ON CONFLICT DO UPDATE SET device_alias = ?3";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
 
-        const std::vector<char> msg_buf(payload, payload + payload_len);
-        MsgPrintResponse msg_response;
-        msg_response.decode(msg_buf);
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
 
-        std::pair<uint64_t, uint64_t> key{ msg_response.request_code_part1(), msg_response.request_code_part2() };
-        const std::lock_guard<std::mutex> guard(m_mutex);
-        auto iter = m_print_callbacks.find(key);
-        if (m_print_callbacks.end() == iter) {
-            return;
-        }
-        iter->second.callback(*iter->second.device, msg_response.print_result());
-        m_print_callbacks.erase(iter);
-        return;
+            ret = sqlite3_bind_text(stmt, 2, alias.first.data(), alias.first.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind device parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
 
-    } else if (   0 <= std::strlen(topic) - print_progress_postfix.size()
-               && 0 == print_progress_postfix.compare(0, print_progress_postfix.size(), topic + std::strlen(topic) - print_progress_postfix.size())) {
-        const char *first = topic + prefix.size();
-        const char *last = topic + std::strlen(topic) - print_progress_postfix.size();
-        const char *pos = std::find(first, last, '/');
-        if (pos >= last) {
-            std::cerr << "Unexpected topic format: " << topic << "\n";
-            return;
-        }
-        const std::string provider(first, pos);
-        const std::string device(pos+1, last);
+            ret = sqlite3_bind_text(stmt, 3, alias.second.data(), alias.second.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind alias parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+            ret = sqlite3_step(stmt);
+            if (SQLITE_CONSTRAINT == ret) {
+                std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
 
-        const std::vector<char> msg_buf(payload, payload + payload_len);
-        MsgPrintProgress msg_progress;
-        msg_progress.decode(msg_buf);
+            if (SQLITE_DONE != ret) {
+                std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
 
-        sqlite3_stmt *stmt;
-        std::string s_stmt = "INSERT INTO devices (provider, device, print_percentage, print_remaining_time) VALUES (?1, ?2, ?3, ?4) "
-                             "ON CONFLICT DO UPDATE SET print_percentage = ?3, print_remaining_time = ?4";
-        int ret = sqlite3_prepare_v2(m_db,
-                                     s_stmt.data(),
-                                     s_stmt.size(),
-                                     &stmt,
-                                     NULL);
-        if (SQLITE_OK != ret) {
             sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
         }
-
-        ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind provider parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-
-        ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind device parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-
-        ret = sqlite3_bind_int(stmt, 3, msg_progress.percentage());
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind print_percentage parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-
-        ret = sqlite3_bind_int(stmt, 4, msg_progress.remaining_time());
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind print_remaining_time parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-        ret = sqlite3_step(stmt);
-        if (SQLITE_CONSTRAINT == ret) {
-            std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
-            err += sqlite3_errmsg(m_db);
-            sqlite3_finalize(stmt);
-            throw std::runtime_error(err);
-        }
-
-        if (SQLITE_DONE != ret) {
-            std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
-            err += sqlite3_errmsg(m_db);
-            sqlite3_finalize(stmt);
-            throw std::runtime_error(err);
-        }
-
-        sqlite3_finalize(stmt);
 
     } else {
-        std::cerr << "Unexpected mqtt topic postfix: " << topic << "\n";
+        std::cerr << "Unexpected mqtt topic prefix\n";
         return;
     }
 }
@@ -333,11 +453,15 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
 
     std::pair<std::string, std::string> sql_hints = convert_hint(hint);
 
-    std::string s_stmt =  "SELECT provider, device, state, print_percentage, print_remaining_time FROM devices WHERE device LIKE '"
-                        + sql_hints.second
-                        + "' ESCAPE '\\' AND provider LIKE '"
-                        + sql_hints.first
-                        + "' ESCAPE '\\' ORDER BY device, provider;";
+    // TODO: implement '-n'
+    std::string s_stmt =  "SELECT d.provider, d.device, d.state, d.print_percentage, d.print_remaining_time, d.device_alias, a.alias "
+                          "FROM devices AS d "
+                          "LEFT JOIN provider_alias AS a ON d.provider = a.provider "
+                          "WHERE (   d.device_alias LIKE '" + sql_hints.second + "' ESCAPE '\\' "
+                          "       OR (d.device_alias IS NULL AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\'))"
+                          "AND (   a.alias LIKE '" + sql_hints.first + "' ESCAPE '\\' "
+                          "     OR (a.alias IS NULL AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' ))"
+                          "ORDER BY d.device_alias, d.device, a.alias, d.provider;";
     ret = sqlite3_prepare_v2(m_db,
                              s_stmt.data(),
                              s_stmt.size(),
@@ -356,6 +480,12 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
         devices->back().state = (Device::State)sqlite3_column_int(stmt, 2);
         devices->back().print_percentage = sqlite3_column_int(stmt, 3);
         devices->back().print_remaining_time = sqlite3_column_int(stmt, 4);
+        if (sqlite3_column_text(stmt, 5)) {
+            devices->back().device_alias = (const char *)sqlite3_column_text(stmt, 5);
+        }
+        if (sqlite3_column_text(stmt, 6)) {
+            devices->back().provider_alias = (const char *)sqlite3_column_text(stmt, 6);
+        }
     }
 
     return devices;
