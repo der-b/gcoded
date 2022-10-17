@@ -494,6 +494,8 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
         }
     }
 
+    sqlite3_finalize(stmt);
+
     return devices;
 }
 
@@ -518,6 +520,73 @@ void Client::print(const Client::DeviceInfo &dev, const std::string &gcode, std:
     std::string topic = m_conf.mqtt_prefix() + "/clients/" + dev.provider + "/" + dev.name + "/print_request";
     m_mqtt.publish(topic, payload);
 }
+
+
+/*
+ * get_provider_aliases()
+ */
+std::unique_ptr<std::map<std::string, std::string>> Client::get_provider_aliases()
+{
+    int ret;
+    std::unique_ptr<std::map<std::string, std::string>> aliases = std::make_unique<std::map<std::string, std::string>>();
+    sqlite3_stmt *stmt;
+
+    std::string s_stmt = "SELECT provider, alias FROM provider_alias";
+    ret = sqlite3_prepare_v2(m_db,
+                             s_stmt.data(),
+                             s_stmt.size(),
+                             &stmt,
+                             NULL);
+    if (SQLITE_OK != ret) {
+        std::string err = "Client::devices(): Faild to prepare SELECT statement: ";
+        err += sqlite3_errmsg(m_db);
+        throw std::runtime_error(err);
+    }
+
+    while (SQLITE_ROW == (ret = sqlite3_step(stmt))) {
+        std::string provider = (const char *)sqlite3_column_text(stmt, 0);
+        std::string alias = (const char *)sqlite3_column_text(stmt, 1);
+        (*aliases)[provider] = alias;
+    }
+
+    sqlite3_finalize(stmt);
+
+    return aliases;
+}
+
+
+/*
+ * get_device_aliases()
+ */
+std::unique_ptr<std::map<std::string, std::string>> Client::get_device_aliases()
+{
+    int ret;
+    std::unique_ptr<std::map<std::string, std::string>> aliases = std::make_unique<std::map<std::string, std::string>>();
+    sqlite3_stmt *stmt;
+
+    std::string s_stmt = "SELECT device, device_alias FROM devices WHERE device_alias IS NOT NULL";
+    ret = sqlite3_prepare_v2(m_db,
+                             s_stmt.data(),
+                             s_stmt.size(),
+                             &stmt,
+                             NULL);
+    if (SQLITE_OK != ret) {
+        std::string err = "Client::devices(): Faild to prepare SELECT statement: ";
+        err += sqlite3_errmsg(m_db);
+        throw std::runtime_error(err);
+    }
+
+    while (SQLITE_ROW == (ret = sqlite3_step(stmt))) {
+        std::string device = (const char *)sqlite3_column_text(stmt, 0);
+        std::string alias = (const char *)sqlite3_column_text(stmt, 1);
+        (*aliases)[device] = alias;
+    }
+
+    sqlite3_finalize(stmt);
+
+    return aliases;
+}
+
 
 /*
  * convert_hint()

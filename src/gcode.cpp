@@ -78,6 +78,48 @@ int send(Client &client, const ConfigGcode &conf)
     return 0;
 }
 
+
+/*
+ * alias()
+ */
+int alias(Client &client, const ConfigGcode &conf)
+{
+    if (!conf.command() || "alias" != *conf.command()) {
+        std::cerr << "Invalid command!\n";
+        return 1;
+    }
+
+    const size_t c_args_size = conf.command_args().size();
+    if (0 >= c_args_size) {
+        std::cerr << "You have to provide an ACTION. See 'gcode alias --help'.\n";
+        return 1;
+    }
+
+    if ("list" == conf.command_args()[0]) {
+        std::unique_ptr<std::map<std::string, std::string>> provider_aliases = client.get_provider_aliases();
+        if (provider_aliases && 0 < provider_aliases->size()) {
+            std::cout << "Provider aliases:\n";
+            for (const auto &alias: *provider_aliases) {
+                std::cout << "  " << alias.first << " -> " << alias.second << "\n";
+            }
+        }
+
+        std::unique_ptr<std::map<std::string, std::string>> device_aliases = client.get_device_aliases();
+        if (device_aliases && 0 < device_aliases->size()) {
+            std::cout << "Device aliases:\n";
+            for (const auto &alias: *device_aliases) {
+                std::cout << "  " << alias.first << " -> " << alias.second << "\n";
+            }
+        }
+    } else {
+        std::cerr << "Unknown ACTION: '" << conf.command_args()[0] << "'. See 'gcode alias --help'.\n";
+        return 1;
+    }
+
+    return 0;
+}
+
+
 /*
  * main()
  */
@@ -134,6 +176,8 @@ int main(int argc, char **argv)
         }
     } else if ("send" == *conf.command()) {
         return send(client, conf);
+    } else if ("alias" == *conf.command()) {
+        return alias(client, conf);
     } else {
         std::cerr << "Unknown command: \"" << *conf.command() << "\".\nSee --help for more information.\n";
         return 1;

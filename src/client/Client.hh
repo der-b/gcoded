@@ -27,8 +27,22 @@ class Client : public MQTT::Listener {
         ~Client();
 
         virtual void on_message(const char *topic, const char *payload, size_t payload_len) override;
+        // TODO: Documentation
         std::unique_ptr<std::vector<DeviceInfo>> devices(const std::string &hint = "*");
+        // TODO: Documentation
         void print(const DeviceInfo &dev, const std::string &gcode, std::function<void(const DeviceInfo &, Device::PrintResult)> callback);
+
+        /**
+         * Returns a map of all provider aliases. Thereby, the map key is the provider original name
+         * and the map value is the alias name.
+         */
+        std::unique_ptr<std::map<std::string, std::string>> get_provider_aliases();
+
+        /**
+         * Returns a map of all device aliases. Thereby, the map key is the device original name
+         * and the map value is the alias name.
+         */
+        std::unique_ptr<std::map<std::string, std::string>> get_device_aliases();
 
     private:
         /**

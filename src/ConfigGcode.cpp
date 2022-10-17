@@ -33,7 +33,8 @@ const char help_message[] =
 "\n"
 "COMMANDS: (get further details with \"-h\": e.g. \"gcode list -h\")\n"
 "list         Lists all currently known devices which can process gcode.\n"
-"send         Sends a gcode file to an device.\n";
+"send         Sends a gcode file to an device.\n"
+"alias        Manage aliases.\n";
 
 
 const char list_usage_message[] = "gcode [OPTIONS] list [DEVICE_HINT]\n";
@@ -56,6 +57,12 @@ const char send_help_message[] =
 "             If you want to match all devices of one provider, than you have to provide a\n"
 "             hint like 'providername/*'.\n"
 "             If a hint matches for more than one device, you will be prompt whether you are sure.\n";
+
+const char alias_usage_message[] = "gcode [OPTIONS] alias ACTION\n";
+const char alias_help_message[] =
+"Manage aliases.\n"
+"ACTIONS: \n"
+"list        List all aliases.\n";
 
 
 /*
@@ -81,6 +88,10 @@ const char *ConfigGcode::usage() const
             return list_usage_message;
         } else if ("send" == *m_command) {
             return send_usage_message;
+        } else if ("alias" == *m_command) {
+            return alias_usage_message;
+        } else {
+            std::cerr << "Cant print command specific usage message: Unknown command.\n";
         }
     }
     return usage_message;
@@ -97,6 +108,10 @@ const char *ConfigGcode::help() const
             return list_help_message;
         } else if ("send" == *m_command) {
             return send_help_message;
+        } else if ("alias" == *m_command) {
+            return alias_help_message;
+        } else {
+            std::cerr << "Cant print command specific help message: Unknown command.\n";
         }
     }
     return help_message;
