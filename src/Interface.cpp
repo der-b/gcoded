@@ -4,6 +4,7 @@
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
 #include "mqtt_messages/MsgAliases.hh"
+#include "mqtt_messages/MsgAliasesSetProvider.hh"
 
 /*
  * Interface()
@@ -17,8 +18,10 @@ Interface::Interface(const Config &conf, Aliases &aliases)
     {
         const std::lock_guard<std::mutex> guard(m_mutex);
         m_mqtt.register_listener(this);
-        std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/+/print_request";
-        m_mqtt.subscribe(topic);
+        std::string topic_print_request = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/+/print_request";
+        std::string topic_alias_set = m_conf.mqtt_prefix() + "/aliases/" + m_conf.mqtt_client_id() + "/set";
+        m_mqtt.subscribe(topic_print_request);
+        m_mqtt.subscribe(topic_alias_set);
         m_mqtt.start();
     }
     Detector::get(conf).register_on_new_device(this);
@@ -87,25 +90,38 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
  */
 void Interface::on_message(const char *topic, const char *payload, size_t payload_len)
 {
-    const std::string prefix = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/";
+    const std::string print_prefix = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/";
     const std::string print_postfix = "/print_request";
+    const std::string alias_topic = m_conf.mqtt_prefix() + "/aliases/" + m_conf.mqtt_client_id() + "/set";
 
-    ssize_t res;
-    if (0 != (res = prefix.compare(0, prefix.size(), topic, prefix.size()))) {
-        std::cerr << "Unexpected mqtt topic prefix\n";
-        return;
-    }
+    if (alias_topic == topic) {
+        const std::vector<char> msg_buf(payload, payload + payload_len);
+        MsgAliasesSetProvider provider_msg;
+        try {
+            provider_msg.decode(msg_buf);
+        } catch (const std::exception &e) {
+            std::cerr << "Could not decode set alias message: " << e.what() << "\n";
+            return;
+        }
 
-    if (   0 <= std::strlen(topic) - print_postfix.size()
-        && 0 == print_postfix.compare(0, print_postfix.size(), topic + std::strlen(topic) - print_postfix.size())) {
+        m_aliases.set_provider_alias(provider_msg.provider_alias());
 
-        const char *first = topic + prefix.size();
+    } else if (   0 == print_prefix.compare(0, print_prefix.size(), topic, print_prefix.size())
+               && 0 <= std::strlen(topic) - print_postfix.size()
+               && 0 == print_postfix.compare(0, print_postfix.size(), topic + std::strlen(topic) - print_postfix.size())) {
+
+        const char *first = topic + print_prefix.size();
         const char *last = topic + std::strlen(topic) - print_postfix.size();
         const std::string device(first, last);
 
         const std::vector<char> msg_buf(payload, payload + payload_len);
         MsgPrint print_msg;
-        print_msg.decode(msg_buf);
+        try {
+            print_msg.decode(msg_buf);
+        } catch (const std::exception &e) {
+            std::cerr << "Could not decode print request message: " << e.what() << "\n";
+            return;
+        }
 
         Device::PrintResult result = Device::PrintResult::NET_ERR_NO_DEVICE;
         Detector &detector = Detector::get(m_conf);
@@ -119,8 +135,10 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
         MsgPrintResponse response_msg(print_msg, result);
         std::vector<char> response_buf;
         response_msg.encode(response_buf);
-        std::string response_topic = prefix + device + "/print_response";
+        std::string response_topic = print_prefix + device + "/print_response";
         m_mqtt.publish(response_topic, response_buf);
+    } else {
+        std::cerr << "Got message on unknown topic: " << topic << "\n";
     }
 }
 

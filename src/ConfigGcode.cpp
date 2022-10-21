@@ -62,7 +62,12 @@ const char alias_usage_message[] = "gcode [OPTIONS] alias ACTION\n";
 const char alias_help_message[] =
 "Manage aliases.\n"
 "ACTIONS: \n"
-"list        List all aliases.\n";
+"list           List all aliases.\n"
+"set            Set aliases for providers/devices. It expects three arguments: TYPE NAME ALIAS.\n"
+"               TYPE is either 'provider' or 'device'\n"
+"               NAME is the name of the provider or device\n"
+"               ALIAS is the new alias of the provider or alias. This argument is optional. If it is\n"
+"               omitted, than the alias is removed\n";
 
 
 /*

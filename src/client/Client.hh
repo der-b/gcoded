@@ -29,6 +29,7 @@ class Client : public MQTT::Listener {
         virtual void on_message(const char *topic, const char *payload, size_t payload_len) override;
         // TODO: Documentation
         std::unique_ptr<std::vector<DeviceInfo>> devices(const std::string &hint = "*");
+        std::unique_ptr<std::vector<DeviceInfo>> devices(const std::string &hint, bool resolve_aliases);
         // TODO: Documentation
         void print(const DeviceInfo &dev, const std::string &gcode, std::function<void(const DeviceInfo &, Device::PrintResult)> callback);
 
@@ -43,6 +44,18 @@ class Client : public MQTT::Listener {
          * and the map value is the alias name.
          */
         std::unique_ptr<std::map<std::string, std::string>> get_device_aliases();
+
+        /**
+         * returns all provider.
+         */
+        std::unique_ptr<std::vector<std::string>> get_providers(const std::string &hint = "*");
+
+        /**
+         * Sets the alias of a provider. if alias has a size of zero, an existing alias is deleted.
+         *
+         * Returns false, if the given provider does not exist.
+         */
+        bool set_provider_alias(const std::string &provider_hint, const std::string &alias);
 
     private:
         /**

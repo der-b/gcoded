@@ -7,6 +7,7 @@
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
 #include "mqtt_messages/MsgAliases.hh"
+#include "mqtt_messages/MsgAliasesSetProvider.hh"
 
 /*
  * Client()
@@ -331,52 +332,86 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
         MsgAliases msg_aliases;
         msg_aliases.decode(msg_buf);
 
-        sqlite3_stmt *stmt;
-        std::string s_stmt = "INSERT INTO provider_alias (provider, alias) VALUES (?1, ?2) "
-                             "ON CONFLICT DO UPDATE SET alias = ?2";
-        int ret = sqlite3_prepare_v2(m_db,
-                                     s_stmt.data(),
-                                     s_stmt.size(),
-                                     &stmt,
-                                     NULL);
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
+        if (msg_aliases.provider_alias().size()) {
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "INSERT INTO provider_alias (provider, alias) VALUES (?1, ?2) "
+                                 "ON CONFLICT DO UPDATE SET alias = ?2";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
 
-        ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind provider parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
 
-        ret = sqlite3_bind_text(stmt, 2, msg_aliases.provider_alias().data(), msg_aliases.provider_alias().size(), NULL);
-        if (SQLITE_OK != ret) {
-            sqlite3_finalize(stmt);
-            std::string err = "Client::on_message(): Failed to bind alias parameter: ";
-            err += sqlite3_errmsg(m_db);
-            throw std::runtime_error(err);
-        }
-        ret = sqlite3_step(stmt);
-        if (SQLITE_CONSTRAINT == ret) {
-            std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
-            err += sqlite3_errmsg(m_db);
-            sqlite3_finalize(stmt);
-            throw std::runtime_error(err);
-        }
+            ret = sqlite3_bind_text(stmt, 2, msg_aliases.provider_alias().data(), msg_aliases.provider_alias().size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind alias parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+            ret = sqlite3_step(stmt);
+            if (SQLITE_CONSTRAINT == ret) {
+                std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
 
-        if (SQLITE_DONE != ret) {
-            std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
-            err += sqlite3_errmsg(m_db);
-            sqlite3_finalize(stmt);
-            throw std::runtime_error(err);
-        }
+            if (SQLITE_DONE != ret) {
+                std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
 
-        sqlite3_finalize(stmt);
+            sqlite3_finalize(stmt);
+        } else {
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "DELETE FROM  provider_alias WHERE provider = ?1";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare DELETE statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_step(stmt);
+            if (SQLITE_DONE != ret) {
+                std::string err = "Client::on_message(): Execution of the DELETE statment failed: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            sqlite3_finalize(stmt);
+        }
 
         for (const auto &alias: msg_aliases.aliases()) {
             sqlite3_stmt *stmt;
@@ -447,6 +482,15 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
  */
 std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::string &hint)
 {
+    return devices(hint, m_conf.resolve_aliases());
+}
+
+
+/*
+ * devices()
+ */
+std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::string &hint, bool resolve_aliases)
+{
     int ret;
     std::unique_ptr<std::vector<Client::DeviceInfo>> devices = std::make_unique<std::vector<Client::DeviceInfo>>();
     sqlite3_stmt *stmt;
@@ -457,7 +501,7 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
                           "FROM devices AS d "
                           "LEFT JOIN provider_alias AS a ON d.provider = a.provider "
                           "WHERE d.state!=0 ";
-    if (m_conf.resolve_aliases()) {
+    if (resolve_aliases) {
         s_stmt += "AND (   d.device_alias LIKE '" + sql_hints.second + "' ESCAPE '\\' "
                   "       OR (d.device_alias IS NULL AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\')) "
                   "AND (   a.alias LIKE '" + sql_hints.first + "' ESCAPE '\\' "
@@ -589,13 +633,74 @@ std::unique_ptr<std::map<std::string, std::string>> Client::get_device_aliases()
 
 
 /*
+ * get_providers()
+ */
+std::unique_ptr<std::vector<std::string>> Client::get_providers(const std::string &hint)
+{
+    int ret;
+    if (std::string::npos != hint.find("/")) {
+        throw std::runtime_error("HINT contains invalid characters ('/')");
+    }
+    std::string hint_copy = hint + "/*";
+    std::pair<std::string, std::string> sql_hints = convert_hint(hint_copy);
+
+    std::unique_ptr<std::vector<std::string>> providers = std::make_unique<std::vector<std::string>>();
+    sqlite3_stmt *stmt;
+
+    std::string s_stmt = "SELECT DISTINCT provider "
+                         "FROM devices "
+                         "WHERE provider IS NOT NULL "
+                         "AND provider LIKE '" + sql_hints.first + "' ESCAPE '\\' ";
+    ret = sqlite3_prepare_v2(m_db,
+                             s_stmt.data(),
+                             s_stmt.size(),
+                             &stmt,
+                             NULL);
+    if (SQLITE_OK != ret) {
+        std::string err = "Client::get_providers(): Faild to prepare SELECT statement: ";
+        err += sqlite3_errmsg(m_db);
+        throw std::runtime_error(err);
+    }
+
+    while (SQLITE_ROW == (ret = sqlite3_step(stmt))) {
+        std::string provider = (const char *)sqlite3_column_text(stmt, 0);
+        providers->push_back(provider);
+    }
+
+    sqlite3_finalize(stmt);
+
+    return providers;
+}
+
+
+/*
+ * set_provider_alias()
+ */
+bool Client::set_provider_alias(const std::string &provider, const std::string &alias)
+{
+    auto provider_list = get_providers(provider);
+    if (!provider_list || 1 != provider_list->size()) {
+        return false;
+    }
+
+    MsgAliasesSetProvider msg;
+    msg.set_provider_alias(alias);
+    std::vector<char> msg_buf;
+    msg.encode(msg_buf);
+    std::string topic = m_conf.mqtt_prefix() + "/aliases/" + provider_list->front() + "/set";
+    m_mqtt.publish(topic, msg_buf);
+    return true;
+}
+
+
+/*
  * convert_hint()
  */
 std::pair<std::string, std::string> Client::convert_hint(const std::string &hint) const
 {
     if (   hint.find("'") != std::string::npos
         || hint.find("\"") != std::string::npos) {
-        throw std::runtime_error("DEVICE_HINT contains invalid characters (' or \")");
+        throw std::runtime_error("HINT contains invalid characters (' or \")");
     }
     std::string::size_type pos = hint.find("/");
     std::string provider_hint;

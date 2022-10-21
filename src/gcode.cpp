@@ -111,6 +111,34 @@ int alias(Client &client, const ConfigGcode &conf)
                 std::cout << "  " << alias.first << " -> " << alias.second << "\n";
             }
         }
+    } else if ("set" == conf.command_args()[0]) {
+        const size_t count = conf.command_args().size();
+        if (3 != count && 4 != count) {
+            std::cerr << "Wrong argument count: See 'gcode alias --help'.\n";
+        }
+        if ("provider" == conf.command_args()[1]) {
+            std::string alias;
+            if (count == 4) {
+                alias = conf.command_args()[3];
+            }
+            if (!client.set_provider_alias(conf.command_args()[2], alias)) {
+                auto providers = client.get_providers(conf.command_args()[2]);
+                if (0 == providers->size()) {
+                    std::cerr << "No provider fond which matches: '" + conf.command_args()[2] + "'\n";
+                } else {
+                    std::cerr << "More than one provider fond which matches: '" + conf.command_args()[2] + "':\n";
+                    for (const auto &provider: *providers) {
+                        std::cerr << "  " << provider << "\n";
+                    }
+                }
+                return 1;
+            }
+        } else if ("device" == conf.command_args()[1]) {
+            throw std::runtime_error("gcode alias set device: Not Yet Implemented.");
+        } else {
+            std::cerr << "Unknown alias TYPE: '" + conf.command_args()[1] + "'. (See 'gcode alias --help')\n";
+            return 1;
+        }
     } else {
         std::cerr << "Unknown ACTION: '" << conf.command_args()[0] << "'. See 'gcode alias --help'.\n";
         return 1;
