@@ -40,6 +40,13 @@ add_executable(test_msg_aliases EXCLUDE_FROM_ALL
 add_dependencies(check test_msg_aliases)
 add_test(NAME test_msg_aliases COMMAND test_msg_aliases)
 
+add_executable(test_msg_aliases_set EXCLUDE_FROM_ALL
+    test_msg_aliases_set.cpp
+    ../../src/mqtt_messages/MsgAliasesSet.cpp
+    ../../src/mqtt_messages/MsgType.cpp)
+add_dependencies(check test_msg_aliases_set)
+add_test(NAME test_msg_aliases_set COMMAND test_msg_aliases_set)
+
 add_executable(test_msg_aliases_set_provider EXCLUDE_FROM_ALL
     test_msg_aliases_set_provider.cpp
     ../../src/mqtt_messages/MsgAliasesSetProvider.cpp
