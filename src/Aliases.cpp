@@ -299,7 +299,7 @@ bool Aliases::set_alias(const std::string &device, const std::string &alias)
 
     sqlite3_stmt *stmt;
     std::string s_stmt = "INSERT INTO alias (device, alias) VALUES (?1, ?2) "
-                         "ON CONFLICT (alias) DO UPDATE SET alias = ?2 WHERE device = ?1";
+                         "ON CONFLICT (device) DO UPDATE SET alias = ?2";
     int ret = sqlite3_prepare_v2(m_db,
                                  s_stmt.data(),
                                  s_stmt.size(),

@@ -123,7 +123,7 @@ int alias(Client &client, const ConfigGcode &conf)
             }
             if (!client.set_provider_alias(conf.command_args()[2], alias)) {
                 auto providers = client.get_providers(conf.command_args()[2]);
-                if (0 == providers->size()) {
+                if (!providers || 0 == providers->size()) {
                     std::cerr << "No provider fond which matches: '" + conf.command_args()[2] + "'\n";
                 } else {
                     std::cerr << "More than one provider fond which matches: '" + conf.command_args()[2] + "':\n";
@@ -134,7 +134,22 @@ int alias(Client &client, const ConfigGcode &conf)
                 return 1;
             }
         } else if ("device" == conf.command_args()[1]) {
-            throw std::runtime_error("gcode alias set device: Not Yet Implemented.");
+            std::string alias;
+            if (count == 4) {
+                alias = conf.command_args()[3];
+            }
+            if (!client.set_device_alias(conf.command_args()[2], alias)) {
+                auto devices = client.devices(conf.command_args()[2]);
+                if (!devices || 0 == devices->size()) {
+                    std::cerr << "No device fond which matches: '" + conf.command_args()[2] + "'\n";
+                } else {
+                    std::cerr << "More than one device fond which matches: '" + conf.command_args()[2] + "':\n";
+                    for (const auto &device: *devices) {
+                        std::cerr << "  " << device.provider << "/" << device.name << "\n";
+                    }
+                }
+                return 1;
+            }
         } else {
             std::cerr << "Unknown alias TYPE: '" + conf.command_args()[1] + "'. (See 'gcode alias --help')\n";
             return 1;

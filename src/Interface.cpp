@@ -4,6 +4,7 @@
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
 #include "mqtt_messages/MsgAliases.hh"
+#include "mqtt_messages/MsgAliasesSet.hh"
 #include "mqtt_messages/MsgAliasesSetProvider.hh"
 
 /*
@@ -96,15 +97,24 @@ void Interface::on_message(const char *topic, const char *payload, size_t payloa
 
     if (alias_topic == topic) {
         const std::vector<char> msg_buf(payload, payload + payload_len);
-        MsgAliasesSetProvider provider_msg;
         try {
+            MsgAliasesSetProvider provider_msg;
             provider_msg.decode(msg_buf);
+            m_aliases.set_provider_alias(provider_msg.provider_alias());
+            return;
+        } catch (...) {
+        }
+
+
+        try {
+            MsgAliasesSet device_msg;
+            device_msg.decode(msg_buf);
+            m_aliases.set_alias(device_msg.device_name(), device_msg.device_alias());
         } catch (const std::exception &e) {
-            std::cerr << "Could not decode set alias message: " << e.what() << "\n";
+            std::cerr << "Faild to set alias: " << e.what() << "\n";
             return;
         }
 
-        m_aliases.set_provider_alias(provider_msg.provider_alias());
 
     } else if (   0 == print_prefix.compare(0, print_prefix.size(), topic, print_prefix.size())
                && 0 <= std::strlen(topic) - print_postfix.size()

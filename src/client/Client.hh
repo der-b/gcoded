@@ -51,11 +51,18 @@ class Client : public MQTT::Listener {
         std::unique_ptr<std::vector<std::string>> get_providers(const std::string &hint = "*");
 
         /**
-         * Sets the alias of a provider. if alias has a size of zero, an existing alias is deleted.
+         * Sets the alias of a provider. If alias has a size of zero, an existing alias is deleted.
          *
          * Returns false, if the given provider does not exist.
          */
         bool set_provider_alias(const std::string &provider_hint, const std::string &alias);
+
+        /**
+         * Sets the alias of a device. If alias has a size of zero, an existing alias is deleted.
+         *
+         * Returns false, if the given device does not exist.
+         */
+        bool set_device_alias(const std::string &device_hint, const std::string &alias);
 
     private:
         /**

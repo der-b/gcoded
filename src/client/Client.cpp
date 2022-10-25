@@ -7,6 +7,7 @@
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
 #include "mqtt_messages/MsgAliases.hh"
+#include "mqtt_messages/MsgAliasesSet.hh"
 #include "mqtt_messages/MsgAliasesSetProvider.hh"
 
 /*
@@ -676,9 +677,9 @@ std::unique_ptr<std::vector<std::string>> Client::get_providers(const std::strin
 /*
  * set_provider_alias()
  */
-bool Client::set_provider_alias(const std::string &provider, const std::string &alias)
+bool Client::set_provider_alias(const std::string &provider_hint, const std::string &alias)
 {
-    auto provider_list = get_providers(provider);
+    auto provider_list = get_providers(provider_hint);
     if (!provider_list || 1 != provider_list->size()) {
         return false;
     }
@@ -688,6 +689,26 @@ bool Client::set_provider_alias(const std::string &provider, const std::string &
     std::vector<char> msg_buf;
     msg.encode(msg_buf);
     std::string topic = m_conf.mqtt_prefix() + "/aliases/" + provider_list->front() + "/set";
+    m_mqtt.publish(topic, msg_buf);
+    return true;
+}
+
+
+/*
+ * set_device_alias()
+ */
+bool Client::set_device_alias(const std::string &device_hint, const std::string &alias)
+{
+    auto devices = this->devices(device_hint, false);
+    if (!devices || 1 != devices->size()) {
+        return false;
+    }
+    MsgAliasesSet msg;
+    msg.set_device_name(devices->front().name);
+    msg.set_device_alias(alias);
+    std::vector<char> msg_buf;
+    msg.encode(msg_buf);
+    std::string topic = m_conf.mqtt_prefix() + "/aliases/" + devices->front().provider + "/set";
     m_mqtt.publish(topic, msg_buf);
     return true;
 }
