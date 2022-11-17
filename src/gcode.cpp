@@ -2,6 +2,7 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <iomanip>
 #include <atomic>
 #include "ConfigGcode.hh"
 #include "client/Client.hh"
