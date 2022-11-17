@@ -355,7 +355,9 @@ bool Aliases::set_alias(const std::string &device, const std::string &alias)
 
     sqlite3_finalize(stmt);
 
-    if (0 == sqlite3_changes64(m_db)) {
+    // TODO: use sqlite3_changes64() ... unfortunately this function is not avialiable on rasbian
+    //       i don't know how to check for this at compile time.
+    if (0 == sqlite3_changes(m_db)) {
         return false;
     }
 
