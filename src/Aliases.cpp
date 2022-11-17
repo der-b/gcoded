@@ -113,7 +113,7 @@ Aliases::~Aliases()
 std::optional<std::string> Aliases::provider_alias()
 {
     if (!m_db) {
-        return nullptr;
+        return std::nullopt;
     }
 
     sqlite3_stmt *stmt;
