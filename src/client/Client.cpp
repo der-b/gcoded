@@ -156,7 +156,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 
             sqlite3_stmt *stmt;
             std::string s_stmt = "INSERT INTO devices (provider, device, state) VALUES (?1, ?2, ?3) "
-                                 "ON CONFLICT DO UPDATE SET state = ?3";
+                                 "ON CONFLICT (provider, device) DO UPDATE SET state = ?3";
             int ret = sqlite3_prepare_v2(m_db,
                                          s_stmt.data(),
                                          s_stmt.size(),
@@ -253,7 +253,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 
             sqlite3_stmt *stmt;
             std::string s_stmt = "INSERT INTO devices (provider, device, print_percentage, print_remaining_time) VALUES (?1, ?2, ?3, ?4) "
-                                 "ON CONFLICT DO UPDATE SET print_percentage = ?3, print_remaining_time = ?4";
+                                 "ON CONFLICT (provider, device) DO UPDATE SET print_percentage = ?3, print_remaining_time = ?4";
             int ret = sqlite3_prepare_v2(m_db,
                                          s_stmt.data(),
                                          s_stmt.size(),
@@ -336,7 +336,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
         if (msg_aliases.provider_alias().size()) {
             sqlite3_stmt *stmt;
             std::string s_stmt = "INSERT INTO provider_alias (provider, alias) VALUES (?1, ?2) "
-                                 "ON CONFLICT DO UPDATE SET alias = ?2";
+                                 "ON CONFLICT (provider) DO UPDATE SET alias = ?2";
             int ret = sqlite3_prepare_v2(m_db,
                                          s_stmt.data(),
                                          s_stmt.size(),
@@ -417,7 +417,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
         for (const auto &alias: msg_aliases.aliases()) {
             sqlite3_stmt *stmt;
             std::string s_stmt = "INSERT INTO devices (provider, device, device_alias) VALUES (?1, ?2, ?3) "
-                                 "ON CONFLICT DO UPDATE SET device_alias = ?3";
+                                 "ON CONFLICT (provider, device) DO UPDATE SET device_alias = ?3";
             int ret = sqlite3_prepare_v2(m_db,
                                          s_stmt.data(),
                                          s_stmt.size(),
