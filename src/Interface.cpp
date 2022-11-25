@@ -74,14 +74,17 @@ void Interface::on_state_change(Device &dev, enum Device::State new_state)
         std::string topic_pp = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + dev.name() + "/print_progress";
         m_mqtt.publish_retained(topic.c_str(), NULL, 0);
         m_mqtt.publish_retained(topic_pp.c_str(), NULL, 0);
+        const std::lock_guard<std::mutex> guard(m_mutex);
         m_retain_topics.erase(topic);
         m_retain_topics.erase(topic_pp);
         m_mqtt.publish(topic, buf);
     } else {
         m_mqtt.publish_retained(topic, buf);
+        const std::lock_guard<std::mutex> guard(m_mutex);
         m_retain_topics.insert(topic);
     }
     if (!dev.is_valid()) {
+        const std::lock_guard<std::mutex> guard(m_mutex);
         dev.unregister_listener(this);
     }
 }
@@ -163,6 +166,7 @@ void Interface::on_build_progress_change(Device &device, unsigned percentage, un
     progress.encode(buf);
     std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + device.name() + "/print_progress";
     m_mqtt.publish_retained(topic, buf);
+    const std::lock_guard<std::mutex> guard(m_mutex);
     m_retain_topics.insert(topic);
 }
 
@@ -184,5 +188,6 @@ void Interface::on_alias_change()
     msg_aliases.encode(buf);
     std::string topic = m_conf.mqtt_prefix() + "/aliases/" + m_conf.mqtt_client_id();
     m_mqtt.publish_retained(topic, buf);
+    const std::lock_guard<std::mutex> guard(m_mutex);
     m_retain_topics.insert(topic);
 }
