@@ -85,6 +85,7 @@ void Config::set_default()
     m_mqtt_prefix = "gcoded";
     m_mqtt_user = std::nullopt;
     m_mqtt_password = std::nullopt;
+    m_mqtt_connect_retries = std::nullopt;
     m_load_dummy = false;
     m_print_help = false;
     m_verbose = false;
@@ -296,6 +297,21 @@ void Config::load_config()
             m_mqtt_password = var_value;
         } else if ("mqtt_prefix" == var_name) {
             m_mqtt_prefix = var_value;
+        } else if ("mqtt_connect_retries" == var_name) {
+            std::optional<uint32_t> value = parse_mqtt_connect_retries_value(var_value);
+            if (!value) {
+                std::string err = "Parsing error in '";
+                err += *m_conf_file;
+                err += "' on line ";
+                err += std::to_string(line_counter);
+                err += ": invalid variable value '";
+                err += var_value;
+                err += "' for variable '";
+                err += var_name;
+                err += "'";
+                throw std::runtime_error(err);
+            }
+            m_mqtt_connect_retries = *value;
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -389,6 +405,27 @@ std::optional<uint16_t> Config::parse_mqtt_port_value(const std::string &value) 
 
 
 /*
+ * parse_mqtt_connect_retries_value()
+ */
+std::optional<uint32_t> Config::parse_mqtt_connect_retries_value(const std::string &value) const
+{
+    size_t end;
+    int64_t retries = std::stol(value, &end, 0);
+    if (value.length() != end) {
+        return std::nullopt;
+    }
+    if (0 > retries) {
+        return std::nullopt;
+    }
+    if (std::numeric_limits<uint32_t>::max() < retries) {
+        return std::nullopt;
+    }
+
+    return retries;
+}
+
+
+/*
  * operator<<()
  */
 std::ostream& operator<<(std::ostream& out, const Config &conf)
@@ -423,6 +460,12 @@ std::ostream& operator<<(std::ostream& out, const Config &conf)
         out << "<none>\n";
     }
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
+    out << "mqtt_connect_retires: ";
+    if (conf.mqtt_connect_retries()) {
+        out << *conf.mqtt_connect_retries() << "\n";
+    } else {
+        out << "endless\n";
+    }
     out << "load_dummy: " << ((conf.load_dummy())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;

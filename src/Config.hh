@@ -89,6 +89,15 @@ class Config : public MQTTConfig {
 
 
         /**
+         * Connection retries before raising an exception.
+         * Infenite retries if not set.
+         */
+        virtual const std::optional<uint32_t> &mqtt_connect_retries() const override {
+            return m_mqtt_connect_retries;
+        }
+
+
+        /**
          * returns true if dummy devices shall be loaded
          */
         const bool load_dummy() const {
@@ -153,6 +162,7 @@ class Config : public MQTTConfig {
         void parse_args(int argc, char **argv);
 
         std::optional<uint16_t> parse_mqtt_port_value(const std::string &value) const;
+        std::optional<uint32_t> parse_mqtt_connect_retries_value(const std::string &value) const;
 
 
     private:
@@ -165,6 +175,7 @@ class Config : public MQTTConfig {
         std::optional<std::string> m_mqtt_user;
         std::optional<std::string> m_mqtt_password;
         std::string m_mqtt_prefix;
+        std::optional<uint32_t> m_mqtt_connect_retries;
         bool m_load_dummy;
         bool m_print_help;
         bool m_verbose;

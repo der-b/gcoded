@@ -11,13 +11,22 @@ void on_connect(struct mosquitto *mosq, void *_data, int reason_code)
     // the members in the same way as in the class methods
     struct MQTT::callback_data &m_cb_data = *data;
 
+    const std::lock_guard<std::mutex> guard(m_cb_data.mutex);
+    data->connection_try++;
 
     if (reason_code) {
-        std::cerr << "Faild to connect: " << mosquitto_connack_string(reason_code) << "\n";
+        std::cerr << "Faild to connect("
+                  << m_cb_data.connection_try
+                  << "): "
+                  << mosquitto_connack_string(reason_code)
+                  << "\n";
+        if (m_cb_data.conf.mqtt_connect_retries() &&
+            data->connection_try >= *m_cb_data.conf.mqtt_connect_retries()) {
+            throw std::runtime_error("Limit of connection retries reached. Giving up.");
+        }
         return;
     }
 
-    const std::lock_guard<std::mutex> guard(m_cb_data.mutex);
     for (const std::string &topic: m_cb_data.topics)
     {
         //std::cout << "subscribe: " << topic << "\n";

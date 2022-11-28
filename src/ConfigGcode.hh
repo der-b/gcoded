@@ -65,6 +65,16 @@ class ConfigGcode : public MQTTConfig {
             return m_mqtt_prefix;
         }
 
+
+        /**
+         * Connection retries before raising an exception.
+         * Infinite retries if not set.
+         */
+        virtual const std::optional<uint32_t> &mqtt_connect_retries() const override {
+            return m_mqtt_connect_retries;
+        }
+
+
         /**
          * if true, than the help message shall be printed.
          */
@@ -139,6 +149,7 @@ class ConfigGcode : public MQTTConfig {
         void parse_args(int argc, char **argv);
 
         std::optional<uint16_t> parse_mqtt_port_value(const std::string &value) const;
+        std::optional<uint32_t> parse_mqtt_connect_retries_value(const std::string &value) const;
 
 
     private:
@@ -148,6 +159,7 @@ class ConfigGcode : public MQTTConfig {
         std::optional<std::string> m_mqtt_user;
         std::optional<std::string> m_mqtt_password;
         std::string m_mqtt_prefix;
+        std::optional<uint32_t> m_mqtt_connect_retries;
         std::string m_mqtt_client_id;
         bool m_load_dummy;
         bool m_print_help;

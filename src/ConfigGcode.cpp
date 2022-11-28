@@ -6,30 +6,32 @@
 #include <sys/random.h>
 
 const struct option long_options_config[] = {
-    { "config",      required_argument, 0, 'c' },
-    { "mqtt-broker", required_argument, 0, 'b' },
-    { "mqtt-port",   required_argument, 0, 'p' },
-    { "mqtt-prefix", required_argument, 0, 'e' },
-    { "real-names",  no_argument,       0, 'r' },
-    { "verbose",     no_argument,       0, 'v' },
-    { "help",        no_argument,       0, 'h' },
+    { "config",               required_argument, 0, 'c' },
+    { "mqtt-broker",          required_argument, 0, 'b' },
+    { "mqtt-port",            required_argument, 0, 'p' },
+    { "mqtt-prefix",          required_argument, 0, 'e' },
+    { "mqtt-connect-retries", required_argument, 0, 't' },
+    { "real-names",           no_argument,       0, 'r' },
+    { "verbose",              no_argument,       0, 'v' },
+    { "help",                 no_argument,       0, 'h' },
     { 0, 0, 0, 0 }
 };
 
-const char short_options_config[] = "-c:b:p:e:rvh";
+const char short_options_config[] = "-c:b:p:e:t:rvh";
 
 const char usage_message[] = "gcode [OPTIONS] [COMMAND]\n";
 const char help_message[] = 
 "This program controls is a command line interface to the gcoded daemons registered to an MQTT broker.\n"
 "\n"
 "OPTIONS:\n"
-"-c, --config=file            Configuration file to load.\n"
-"-b, --mqtt-broker=hostname   Hostname or IP of the MQTT broker.\n"
-"-p, --mqtt-port=port         Port of the MQTT broker.\n"
-"-e, --mqtt-prefix=prefix     MQTT topic under which gcoded will expose the interface.\n"
-"-r, --real-names             Do not use aliases for device and provider. Use real names.\n"
-"-v, --verbose                Enable debug output.\n"
-"-h, --help                   Print help message and configuration.\n"
+"-c, --config=file               Configuration file to load.\n"
+"-b, --mqtt-broker=hostname      Hostname or IP of the MQTT broker.\n"
+"-p, --mqtt-port=port            Port of the MQTT broker.\n"
+"-e, --mqtt-prefix=prefix        MQTT topic under which gcoded will expose the interface.\n"
+"-t, --mqtt-connect-retries=num  Number of connection retries to the MQTT broker befor giving up.\n"
+"-r, --real-names                Do not use aliases for device and provider. Use real names.\n"
+"-v, --verbose                   Enable debug output.\n"
+"-h, --help                      Print help message and configuration.\n"
 "\n"
 "COMMANDS: (get further details with \"-h\": e.g. \"gcode list -h\")\n"
 "list         Lists all currently known devices which can process gcode.\n"
@@ -139,6 +141,7 @@ void ConfigGcode::set_default()
     m_mqtt_broker = "localhost";
     m_mqtt_port = 1883;
     m_mqtt_prefix = "gcoded";
+    m_mqtt_connect_retries = 5;
     m_mqtt_client_id = "";
     m_print_help = false;
     m_verbose = false;
@@ -294,6 +297,21 @@ void ConfigGcode::load_config()
             m_mqtt_password = var_value;
         } else if ("mqtt_prefix" == var_name) {
             m_mqtt_prefix = var_value;
+        } else if ("mqtt_connect_retries" == var_name) {
+            std::optional<uint32_t> value = parse_mqtt_connect_retries_value(var_value);
+            if (!value) {
+                std::string err = "Parsing error in '";
+                err += *m_conf_file;
+                err += "' on line ";
+                err += std::to_string(line_counter);
+                err += ": invalid variable value '";
+                err += var_value;
+                err += "' for variable '";
+                err += var_name;
+                err += "'";
+                throw std::runtime_error(err);
+            }
+            m_mqtt_connect_retries = *value;
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -349,6 +367,16 @@ void ConfigGcode::parse_args(int argc, char **argv)
             case 'e':
                 m_mqtt_prefix = optarg;
                 break;
+            case 't':
+                {
+                    std::optional<uint32_t> connect_retries = parse_mqtt_connect_retries_value(optarg);
+                    if (!connect_retries) {
+                        std::string err = "Invalid argument for option -t/--mqtt-connect_retries";
+                        throw std::runtime_error(err);
+                    }
+                    m_mqtt_connect_retries = *connect_retries;
+                }
+                break;
             case 'r':
                 m_resolve_aliases = false;
                 break;
@@ -392,6 +420,27 @@ std::optional<uint16_t> ConfigGcode::parse_mqtt_port_value(const std::string &va
 
 
 /*
+ * parse_mqtt_connect_retries_value()
+ */
+std::optional<uint32_t> ConfigGcode::parse_mqtt_connect_retries_value(const std::string &value) const
+{
+    size_t end;
+    int64_t retries = std::stol(value, &end, 0);
+    if (value.length() != end) {
+        return std::nullopt;
+    }
+    if (0 > retries) {
+        return std::nullopt;
+    }
+    if (std::numeric_limits<uint32_t>::max() < retries) {
+        return std::nullopt;
+    }
+
+    return retries;
+}
+
+
+/*
  * operator<<()
  */
 std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
@@ -419,6 +468,12 @@ std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
         out << "<none>\n";
     }
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
+    out << "mqtt_connect_retires: ";
+    if (conf.mqtt_connect_retries()) {
+        out << *conf.mqtt_connect_retries() << "\n";
+    } else {
+        out << "endless\n";
+    }
     out << "resolve_aliases: " << ((conf.resolve_aliases())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;

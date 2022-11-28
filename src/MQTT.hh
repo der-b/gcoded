@@ -83,6 +83,7 @@ class MQTT {
             std::mutex mutex;
             bool running;
             bool connected;
+            uint32_t connection_try;
             const MQTTConfig &conf;
             struct mosquitto *mosq;
             std::set<Listener *> listener;
@@ -92,7 +93,8 @@ class MQTT {
                 : conf(_conf),
                   running(false),
                   connected(false),
-                  mosq(NULL)
+                  mosq(NULL),
+                  connection_try(0)
             { }
         };
     private:
