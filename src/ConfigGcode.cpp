@@ -288,6 +288,10 @@ void ConfigGcode::load_config()
                 throw std::runtime_error(err);
             }
             m_mqtt_port = *value;
+        } else if ("mqtt_user" == var_name) {
+            m_mqtt_user = var_value;
+        } else if ("mqtt_password" == var_name) {
+            m_mqtt_password = var_value;
         } else if ("mqtt_prefix" == var_name) {
             m_mqtt_prefix = var_value;
         } else {
@@ -401,6 +405,19 @@ std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
     }
     out << "mqtt_broker: " << conf.mqtt_broker() << "\n";
     out << "mqtt_port: " << conf.mqtt_port() << "\n";
+    out << "mqtt_user: ";
+    if (conf.mqtt_user()) {
+        out << *conf.mqtt_user() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_password: ";
+    if (conf.mqtt_password()) {
+        //out << *conf.mqtt_password() << "\n";
+        out << "***\n";
+    } else {
+        out << "<none>\n";
+    }
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
     out << "resolve_aliases: " << ((conf.resolve_aliases())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";

@@ -11,12 +11,14 @@ void on_connect(struct mosquitto *mosq, void *_data, int reason_code)
     // the members in the same way as in the class methods
     struct MQTT::callback_data &m_cb_data = *data;
 
+
     if (reason_code) {
+        std::cerr << "Faild to connect: " << mosquitto_connack_string(reason_code) << "\n";
         return;
     }
 
     const std::lock_guard<std::mutex> guard(m_cb_data.mutex);
-    for (const std::string &topic: m_cb_data.topics) 
+    for (const std::string &topic: m_cb_data.topics)
     {
         //std::cout << "subscribe: " << topic << "\n";
         mosquitto_subscribe(m_cb_data.mosq, NULL, topic.c_str(), 0);
@@ -90,6 +92,18 @@ MQTT::MQTT(const MQTTConfig &conf)
     mosquitto_connect_callback_set(m_cb_data.mosq, on_connect);
     mosquitto_disconnect_callback_set(m_cb_data.mosq, on_disconnect);
     mosquitto_message_callback_set(m_cb_data.mosq, on_message);
+
+    if (conf.mqtt_user()) {
+        int ret = MOSQ_ERR_SUCCESS;
+        if (conf.mqtt_password()) {
+            ret = mosquitto_username_pw_set(m_cb_data.mosq, conf.mqtt_user()->c_str(), conf.mqtt_password()->c_str());
+        } else {
+            ret = mosquitto_username_pw_set(m_cb_data.mosq, conf.mqtt_user()->c_str(), NULL);
+        }
+        if (MOSQ_ERR_SUCCESS != ret) {
+            throw std::runtime_error("Failed to set username and password for mqtt connection.");
+        }
+    }
 
     if (MOSQ_ERR_SUCCESS != mosquitto_connect_async(m_cb_data.mosq,
                                                     m_cb_data.conf.mqtt_broker().c_str(),

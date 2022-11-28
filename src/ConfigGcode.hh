@@ -36,6 +36,22 @@ class ConfigGcode : public MQTTConfig {
         }
 
 
+        /**
+         * returns the used username for the MQTT connection
+         */
+        virtual const std::optional<std::string> &mqtt_user() const override {
+            return m_mqtt_user;
+        }
+
+
+        /**
+         * returns the used password for the MQTT connection
+         */
+        virtual const std::optional<std::string> &mqtt_password() const override {
+            return m_mqtt_password;
+        }
+
+
         virtual const std::string &mqtt_client_id() const override {
             return m_mqtt_client_id;
         }
@@ -129,6 +145,8 @@ class ConfigGcode : public MQTTConfig {
         std::optional<std::filesystem::path> m_conf_file;
         std::string m_mqtt_broker;
         uint16_t m_mqtt_port;
+        std::optional<std::string> m_mqtt_user;
+        std::optional<std::string> m_mqtt_password;
         std::string m_mqtt_prefix;
         std::string m_mqtt_client_id;
         bool m_load_dummy;

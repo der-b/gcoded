@@ -83,6 +83,8 @@ void Config::set_default()
     m_mqtt_broker = "localhost";
     m_mqtt_port = 1883;
     m_mqtt_prefix = "gcoded";
+    m_mqtt_user = std::nullopt;
+    m_mqtt_password = std::nullopt;
     m_load_dummy = false;
     m_print_help = false;
     m_verbose = false;
@@ -288,6 +290,10 @@ void Config::load_config()
                 throw std::runtime_error(err);
             }
             m_mqtt_port = *value;
+        } else if ("mqtt_user" == var_name) {
+            m_mqtt_user = var_value;
+        } else if ("mqtt_password" == var_name) {
+            m_mqtt_password = var_value;
         } else if ("mqtt_prefix" == var_name) {
             m_mqtt_prefix = var_value;
         } else {
@@ -403,6 +409,19 @@ std::ostream& operator<<(std::ostream& out, const Config &conf)
     out << "mqtt_client_id: " << conf.mqtt_client_id() << "\n";
     out << "mqtt_broker: " << conf.mqtt_broker() << "\n";
     out << "mqtt_port: " << conf.mqtt_port() << "\n";
+    out << "mqtt_user: ";
+    if (conf.mqtt_user()) {
+        out << *conf.mqtt_user() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_password: ";
+    if (conf.mqtt_password()) {
+        //out << *conf.mqtt_password() << "\n";
+        out << "***\n";
+    } else {
+        out << "<none>\n";
+    }
     out << "mqtt_prefix: " << conf.mqtt_prefix() << "\n";
     out << "load_dummy: " << ((conf.load_dummy())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";

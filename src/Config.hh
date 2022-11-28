@@ -64,6 +64,22 @@ class Config : public MQTTConfig {
 
 
         /**
+         * returns the used username for the MQTT connection
+         */
+        virtual const std::optional<std::string> &mqtt_user() const override {
+            return m_mqtt_user;
+        }
+
+
+        /**
+         * returns the used password for the MQTT connection
+         */
+        virtual const std::optional<std::string> &mqtt_password() const override {
+            return m_mqtt_password;
+        }
+
+
+        /**
          * Returns the prefix under which the interface for the 3d printers will be
          * exposed.
          */
@@ -115,8 +131,8 @@ class Config : public MQTTConfig {
          * If this file contains an invalid id, than throws an runtime exception.
          * If file does not exist, than this method will attempt to create an this file
          * with proper content.
-         * If this file can't be created, than a temporary id will be generated. Temporary,
-         * id's always start with 'temp-'.
+         * If this file can't be created, than a temporary id will be generated. Temporary IDs
+         * always start with 'temp-'.
          */
         void load_mqtt_client_id();
         
@@ -146,6 +162,8 @@ class Config : public MQTTConfig {
         std::string m_mqtt_client_id;
         std::string m_mqtt_broker;
         uint16_t m_mqtt_port;
+        std::optional<std::string> m_mqtt_user;
+        std::optional<std::string> m_mqtt_password;
         std::string m_mqtt_prefix;
         bool m_load_dummy;
         bool m_print_help;
