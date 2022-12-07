@@ -98,6 +98,25 @@ class Config : public MQTTConfig {
 
 
         /**
+         * Returns the PSK, used while connecting to a MQTT broker.
+         * The identity to the PSK can be retrieved with mqtt_identity()
+         */
+        virtual const std::optional<std::string> &mqtt_psk() const override
+        {
+            return m_mqtt_psk;
+        }
+
+
+        /**
+         * Returns the identity corresponding to the PSK.
+         */
+        virtual const std::optional<std::string> &mqtt_identity() const override
+        {
+            return m_mqtt_identity;
+        }
+
+
+        /**
          * returns true if dummy devices shall be loaded
          */
         const bool load_dummy() const {
@@ -163,6 +182,7 @@ class Config : public MQTTConfig {
 
         std::optional<uint16_t> parse_mqtt_port_value(const std::string &value) const;
         std::optional<uint32_t> parse_mqtt_connect_retries_value(const std::string &value) const;
+        std::optional<std::pair<std::string, std::string>> parse_mqtt_psk(const std::string &value) const;
 
 
     private:
@@ -176,6 +196,8 @@ class Config : public MQTTConfig {
         std::optional<std::string> m_mqtt_password;
         std::string m_mqtt_prefix;
         std::optional<uint32_t> m_mqtt_connect_retries;
+        std::optional<std::string> m_mqtt_psk;
+        std::optional<std::string> m_mqtt_identity;
         bool m_load_dummy;
         bool m_print_help;
         bool m_verbose;

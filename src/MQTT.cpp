@@ -114,6 +114,16 @@ MQTT::MQTT(const MQTTConfig &conf)
         }
     }
 
+    if (conf.mqtt_psk() && conf.mqtt_identity()) {
+        if (conf.verbose()) {
+            std::cout << "MQTT: Try to connect to MQTT Broker with psk and identity.\n";
+        }
+        int ret = mosquitto_tls_psk_set(m_cb_data.mosq, conf.mqtt_psk()->c_str(), conf.mqtt_identity()->c_str(), NULL);
+        if (MOSQ_ERR_SUCCESS != ret) {
+            throw std::runtime_error("Failed to set psk and identity for mqtt connection.");
+        }
+    }
+
     if (MOSQ_ERR_SUCCESS != mosquitto_connect_async(m_cb_data.mosq,
                                                     m_cb_data.conf.mqtt_broker().c_str(),
                                                     m_cb_data.conf.mqtt_port(),

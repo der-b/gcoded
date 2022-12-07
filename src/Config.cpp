@@ -20,7 +20,7 @@ const struct option long_options_config[] = {
 const char short_options_config[] = "-c:b:p:e:vh";
 
 const char usage_message[] = "gcoded [OPTIONS]\n";
-const char help_message[] = 
+const char help_message[] =
 "This program controls systems which accept gcode such as 3d printers.\n"
 "It uses a serial interface for control.\n"
 "\n"
@@ -86,6 +86,8 @@ void Config::set_default()
     m_mqtt_user = std::nullopt;
     m_mqtt_password = std::nullopt;
     m_mqtt_connect_retries = std::nullopt;
+    m_mqtt_psk = std::nullopt;
+    m_mqtt_identity = std::nullopt;
     m_load_dummy = false;
     m_print_help = false;
     m_verbose = false;
@@ -205,7 +207,7 @@ void Config::load_config()
 
         // remove witespaces at the beginning or the end of a line
         trim(line);
-        
+
         if (0 == line.length()) {
             continue;
         }
@@ -283,7 +285,7 @@ void Config::load_config()
                 err += *m_conf_file;
                 err += "' on line ";
                 err += std::to_string(line_counter);
-                err += ": invalid variable value '";
+                err += ": invalid value '";
                 err += var_value;
                 err += "' for variable '";
                 err += var_name;
@@ -304,7 +306,7 @@ void Config::load_config()
                 err += *m_conf_file;
                 err += "' on line ";
                 err += std::to_string(line_counter);
-                err += ": invalid variable value '";
+                err += ": invalid value '";
                 err += var_value;
                 err += "' for variable '";
                 err += var_name;
@@ -312,6 +314,20 @@ void Config::load_config()
                 throw std::runtime_error(err);
             }
             m_mqtt_connect_retries = *value;
+        } else if ("mqtt_psk" == var_name) {
+            std::optional<std::pair<std::string, std::string>> value = parse_mqtt_psk(var_value);
+            if (!value) {
+                std::string err = "Parsing error in '";
+                err += *m_conf_file;
+                err += "' on line ";
+                err += std::to_string(line_counter);
+                err += ": invalid value for variable '";
+                err += var_name;
+                err += "'";
+                throw std::runtime_error(err);
+            }
+            m_mqtt_psk = value->second;
+            m_mqtt_identity = value->first;
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -426,6 +442,27 @@ std::optional<uint32_t> Config::parse_mqtt_connect_retries_value(const std::stri
 
 
 /*
+ * parse_mqtt_psk()
+ */
+std::optional<std::pair<std::string, std::string>> Config::parse_mqtt_psk(const std::string &value) const
+{
+    std::string::size_type pos_colon = value.find(":");
+    if (std::string::npos == pos_colon) {
+        return std::nullopt;
+    }
+
+    std::string identity = value.substr(0, pos_colon);
+    std::string psk = value.substr(pos_colon + 1);
+
+    if (std::string::npos != psk.find_first_not_of("0123456789abcdefABCDEF")) {
+        return std::nullopt;
+    }
+
+    return std::pair<std::string, std::string>(identity, psk);
+}
+
+
+/*
  * operator<<()
  */
 std::ostream& operator<<(std::ostream& out, const Config &conf)
@@ -465,6 +502,19 @@ std::ostream& operator<<(std::ostream& out, const Config &conf)
         out << *conf.mqtt_connect_retries() << "\n";
     } else {
         out << "endless\n";
+    }
+    out << "mqtt_psk: ";
+    if (conf.mqtt_psk()) {
+        //out << *conf.mqtt_psk() << "\n";
+        out << "***\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_identity: ";
+    if (conf.mqtt_identity()) {
+        out << *conf.mqtt_identity() << "\n";
+    } else {
+        out << "<none>\n";
     }
     out << "load_dummy: " << ((conf.load_dummy())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";

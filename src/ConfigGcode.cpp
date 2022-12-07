@@ -143,6 +143,8 @@ void ConfigGcode::set_default()
     m_mqtt_prefix = "gcoded";
     m_mqtt_connect_retries = 5;
     m_mqtt_client_id = "";
+    m_mqtt_psk = std::nullopt;
+    m_mqtt_identity = std::nullopt;
     m_print_help = false;
     m_verbose = false;
     m_resolve_aliases = true;
@@ -283,7 +285,7 @@ void ConfigGcode::load_config()
                 err += *m_conf_file;
                 err += "' on line ";
                 err += std::to_string(line_counter);
-                err += ": invalid variable value '";
+                err += ": invalid value '";
                 err += var_value;
                 err += "' for variable '";
                 err += var_name;
@@ -304,7 +306,7 @@ void ConfigGcode::load_config()
                 err += *m_conf_file;
                 err += "' on line ";
                 err += std::to_string(line_counter);
-                err += ": invalid variable value '";
+                err += ": invalid value '";
                 err += var_value;
                 err += "' for variable '";
                 err += var_name;
@@ -312,6 +314,20 @@ void ConfigGcode::load_config()
                 throw std::runtime_error(err);
             }
             m_mqtt_connect_retries = *value;
+        } else if ("mqtt_psk" == var_name) {
+            std::optional<std::pair<std::string, std::string>> value = parse_mqtt_psk(var_value);
+            if (!value) {
+                std::string err = "Parsing error in '";
+                err += *m_conf_file;
+                err += "' on line ";
+                err += std::to_string(line_counter);
+                err += ": invalid value for variable '";
+                err += var_name;
+                err += "'";
+                throw std::runtime_error(err);
+            }
+            m_mqtt_psk = value->second;
+            m_mqtt_identity = value->first;
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -440,6 +456,28 @@ std::optional<uint32_t> ConfigGcode::parse_mqtt_connect_retries_value(const std:
 }
 
 
+
+/*
+ * parse_mqtt_psk()
+ */
+std::optional<std::pair<std::string, std::string>> ConfigGcode::parse_mqtt_psk(const std::string &value) const
+{
+    std::string::size_type pos_colon = value.find(":");
+    if (std::string::npos == pos_colon) {
+        return std::nullopt;
+    }
+
+    std::string identity = value.substr(0, pos_colon);
+    std::string psk = value.substr(pos_colon + 1);
+
+    if (std::string::npos != psk.find_first_not_of("0123456789abcdefABCDEF")) {
+        return std::nullopt;
+    }
+
+    return std::pair<std::string, std::string>(identity, psk);
+}
+
+
 /*
  * operator<<()
  */
@@ -473,6 +511,19 @@ std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
         out << *conf.mqtt_connect_retries() << "\n";
     } else {
         out << "endless\n";
+    }
+    out << "mqtt_psk: ";
+    if (conf.mqtt_psk()) {
+        out << *conf.mqtt_psk() << "\n";
+        //out << "***\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_identity: ";
+    if (conf.mqtt_identity()) {
+        out << *conf.mqtt_identity() << "\n";
+    } else {
+        out << "<none>\n";
     }
     out << "resolve_aliases: " << ((conf.resolve_aliases())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";

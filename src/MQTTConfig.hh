@@ -13,6 +13,8 @@ class MQTTConfig {
         virtual const std::optional<uint32_t> &mqtt_connect_retries() const = 0;
         virtual const std::string &mqtt_prefix() const = 0;
         virtual const std::string &mqtt_client_id() const = 0;
+        virtual const std::optional<std::string> &mqtt_psk() const = 0;
+        virtual const std::optional<std::string> &mqtt_identity() const = 0;
         virtual const bool verbose() const = 0;
         virtual ~MQTTConfig() {};
 };
