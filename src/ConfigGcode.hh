@@ -95,6 +95,59 @@ class ConfigGcode : public MQTTConfig {
 
 
         /**
+         * Returns the certificate of the certificate authority for validating the
+         * certificate of the MQTT broker.
+         */
+        virtual const std::optional<std::string> &mqtt_cafile() const override
+        {
+            return m_mqtt_cafile;
+        }
+
+
+        /**
+         * Returns the path to a directory wich contains certificates of the certificate authorities
+         * for validating the certificate of the MQTT broker.
+         *
+         * Be aware, that the every time you copy a new certificate in this directory, you have to
+         * execute "openssl rehash <direcory>". In order that this command works correctly, the
+         * certificats needs one of the following filename endings: ".pem", ".crt", ".cer" or ".crl"
+         */
+        virtual const std::optional<std::string> &mqtt_capath() const override
+        {
+            return m_mqtt_capath;
+        }
+
+
+        /**
+         * Returns the path to the certificate file for the client authentification.
+         */
+        virtual const std::optional<std::string> &mqtt_certfile() const override
+        {
+            return m_mqtt_certfile;
+        }
+
+
+        /**
+         * Returns the path to the file containing the private key which belong the certificate
+         * in the certfile.
+         */
+        virtual const std::optional<std::string> &mqtt_keyfile() const override
+        {
+            return m_mqtt_keyfile;
+        }
+
+
+        /**
+         * Returns true if the domain name in the broker certificate will not be validated.
+         * Setting this to true is intended for testing purposes!
+         */
+        virtual const bool mqtt_tls_insecure() const override
+        {
+            return m_mqtt_tls_insecure;
+        }
+
+
+        /**
          * if true, than the help message shall be printed.
          */
         const bool print_help() const {
@@ -167,6 +220,11 @@ class ConfigGcode : public MQTTConfig {
          */
         void parse_args(int argc, char **argv);
 
+        /**
+         * Checks the config on logical errors. Throws an exception if an error was found.
+         */
+        void validate_config();
+
         std::optional<uint16_t> parse_mqtt_port_value(const std::string &value) const;
         std::optional<uint32_t> parse_mqtt_connect_retries_value(const std::string &value) const;
         std::optional<std::pair<std::string, std::string>> parse_mqtt_psk(const std::string &value) const;
@@ -183,6 +241,11 @@ class ConfigGcode : public MQTTConfig {
         std::string m_mqtt_client_id;
         std::optional<std::string> m_mqtt_psk;
         std::optional<std::string> m_mqtt_identity;
+        std::optional<std::string> m_mqtt_cafile;
+        std::optional<std::string> m_mqtt_capath;
+        std::optional<std::string> m_mqtt_certfile;
+        std::optional<std::string> m_mqtt_keyfile;
+        bool m_mqtt_tls_insecure;
         bool m_load_dummy;
         bool m_print_help;
         bool m_verbose;

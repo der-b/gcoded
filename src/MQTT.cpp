@@ -77,6 +77,15 @@ void on_message(struct mosquitto *mosq, void *_data, const struct mosquitto_mess
 
 
 /*
+ * on_log() is a helper function for the MQTT class since we want to hide the c callbacks.
+ */
+void on_log(struct mosquitto *mosq, void *_data, int log_level, const char *log_msg)
+{
+    std::cout << "MQTT: " << log_msg << "\n";
+}
+
+
+/*
  * MQTT()
  */
 MQTT::MQTT(const MQTTConfig &conf)
@@ -101,6 +110,9 @@ MQTT::MQTT(const MQTTConfig &conf)
     mosquitto_connect_callback_set(m_cb_data.mosq, on_connect);
     mosquitto_disconnect_callback_set(m_cb_data.mosq, on_disconnect);
     mosquitto_message_callback_set(m_cb_data.mosq, on_message);
+    if (conf.verbose()) {
+        mosquitto_log_callback_set(m_cb_data.mosq, on_log);
+    }
 
     if (conf.mqtt_user()) {
         int ret = MOSQ_ERR_SUCCESS;
@@ -114,7 +126,44 @@ MQTT::MQTT(const MQTTConfig &conf)
         }
     }
 
-    if (conf.mqtt_psk() && conf.mqtt_identity()) {
+    if (conf.mqtt_cafile() || conf.mqtt_capath()) {
+        const char *cafile = NULL;
+        const char *capath = NULL;
+        const char *certfile = NULL;
+        const char *keyfile = NULL;
+
+        if (conf.mqtt_cafile()) {
+            cafile = conf.mqtt_cafile()->c_str();
+        }
+        if (conf.mqtt_capath()) {
+            capath = conf.mqtt_capath()->c_str();
+        }
+        if (conf.mqtt_certfile()) {
+            certfile = conf.mqtt_certfile()->c_str();
+        }
+        if (conf.mqtt_keyfile()) {
+            keyfile = conf.mqtt_keyfile()->c_str();
+        }
+
+        if (conf.verbose()) {
+            std::cout << "MQTT: Try to connect to MQTT Broker with certificates.\n";
+        }
+        int ret = mosquitto_tls_set(m_cb_data.mosq,
+                                    cafile,
+                                    capath,
+                                    certfile,
+                                    keyfile,
+                                    NULL);
+        if (MOSQ_ERR_SUCCESS != ret) {
+            throw std::runtime_error("Failed to configure certificates for mqtt connection.");
+        }
+        if (conf.mqtt_tls_insecure()) {
+            if (conf.verbose()) {
+                std::cout << "MQTT: WARINING: Hostname validation deactivated.\n";
+            }
+            mosquitto_tls_insecure_set(m_cb_data.mosq, true);
+        }
+    } else if (conf.mqtt_psk() && conf.mqtt_identity()) {
         if (conf.verbose()) {
             std::cout << "MQTT: Try to connect to MQTT Broker with psk and identity.\n";
         }

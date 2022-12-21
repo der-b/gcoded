@@ -15,6 +15,11 @@ class MQTTConfig {
         virtual const std::string &mqtt_client_id() const = 0;
         virtual const std::optional<std::string> &mqtt_psk() const = 0;
         virtual const std::optional<std::string> &mqtt_identity() const = 0;
+        virtual const std::optional<std::string> &mqtt_cafile() const = 0;
+        virtual const std::optional<std::string> &mqtt_capath() const = 0;
+        virtual const std::optional<std::string> &mqtt_certfile() const = 0;
+        virtual const std::optional<std::string> &mqtt_keyfile() const = 0;
+        virtual const bool mqtt_tls_insecure() const = 0;
         virtual const bool verbose() const = 0;
         virtual ~MQTTConfig() {};
 };

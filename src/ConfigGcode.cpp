@@ -11,6 +11,7 @@ const struct option long_options_config[] = {
     { "mqtt-port",            required_argument, 0, 'p' },
     { "mqtt-prefix",          required_argument, 0, 'e' },
     { "mqtt-connect-retries", required_argument, 0, 't' },
+    { "mqtt-tls-insecure",    no_argument,       0, 0 },
     { "real-names",           no_argument,       0, 'r' },
     { "verbose",              no_argument,       0, 'v' },
     { "help",                 no_argument,       0, 'h' },
@@ -20,7 +21,7 @@ const struct option long_options_config[] = {
 const char short_options_config[] = "-c:b:p:e:t:rvh";
 
 const char usage_message[] = "gcode [OPTIONS] [COMMAND]\n";
-const char help_message[] = 
+const char help_message[] =
 "This program controls is a command line interface to the gcoded daemons registered to an MQTT broker.\n"
 "\n"
 "OPTIONS:\n"
@@ -29,6 +30,8 @@ const char help_message[] =
 "-p, --mqtt-port=port            Port of the MQTT broker.\n"
 "-e, --mqtt-prefix=prefix        MQTT topic under which gcoded will expose the interface.\n"
 "-t, --mqtt-connect-retries=num  Number of connection retries to the MQTT broker befor giving up.\n"
+"    --mqtt-tls-insecure         Do not validate domain name in the MQTT broker certificate.\n"
+"                                This should be used only for testing. Allows Man-in-the-middle attacks.\n"
 "-r, --real-names                Do not use aliases for device and provider. Use real names.\n"
 "-v, --verbose                   Enable debug output.\n"
 "-h, --help                      Print help message and configuration.\n"
@@ -82,6 +85,7 @@ ConfigGcode::ConfigGcode(int argc, char **argv)
     parse_config(argc, argv);
     load_config();
     parse_args(argc, argv);
+    validate_config();
 }
 
 
@@ -145,6 +149,11 @@ void ConfigGcode::set_default()
     m_mqtt_client_id = "";
     m_mqtt_psk = std::nullopt;
     m_mqtt_identity = std::nullopt;
+    m_mqtt_cafile = std::nullopt;
+    m_mqtt_capath = std::nullopt;
+    m_mqtt_certfile = std::nullopt;
+    m_mqtt_keyfile = std::nullopt;
+    m_mqtt_tls_insecure = false;
     m_print_help = false;
     m_verbose = false;
     m_resolve_aliases = true;
@@ -207,7 +216,7 @@ void ConfigGcode::load_config()
 
         // remove witespaces at the beginning or the end of a line
         trim(line);
-        
+
         if (0 == line.length()) {
             continue;
         }
@@ -328,6 +337,14 @@ void ConfigGcode::load_config()
             }
             m_mqtt_psk = value->second;
             m_mqtt_identity = value->first;
+        } else if ("mqtt_cafile" == var_name) {
+            m_mqtt_cafile = var_value;
+        } else if ("mqtt_capath" == var_name) {
+            m_mqtt_capath = var_value;
+        } else if ("mqtt_certfile" == var_name) {
+            m_mqtt_certfile = var_value;
+        } else if ("mqtt_keyfile" == var_name) {
+            m_mqtt_keyfile = var_value;
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -357,6 +374,11 @@ void ConfigGcode::parse_args(int argc, char **argv)
         }
 
         switch(c) {
+            case 0:
+                if (std::string("mqtt-tls-insecure") == long_options_config[option_index].name) {
+                    m_mqtt_tls_insecure = true;
+                }
+                break;
             case 1:
                 if (!m_command) {
                     m_command = argv[optind-1];
@@ -410,6 +432,21 @@ void ConfigGcode::parse_args(int argc, char **argv)
                 throw std::runtime_error(err);
                 break;
         }
+    }
+}
+
+
+/*
+ * validate_config()
+ */
+void ConfigGcode::validate_config()
+{
+    if ((!mqtt_certfile()) != (!mqtt_keyfile())) {
+        throw std::runtime_error("If you set one of 'mqtt_certfile' and 'mqtt_keyfile' in your configuration then you also have to set the other!");
+    }
+
+    if ((mqtt_cafile() || mqtt_capath()) && mqtt_psk()) {
+        throw std::runtime_error("You can configure TLS either with PSK ('mqtt_psk') or with certificates ('mqtt_cafile'/'mqtt_capath') but not both.");
     }
 }
 
@@ -525,6 +562,31 @@ std::ostream& operator<<(std::ostream& out, const ConfigGcode &conf)
     } else {
         out << "<none>\n";
     }
+    out << "mqtt_cafile: ";
+    if (conf.mqtt_cafile()) {
+        out << *conf.mqtt_cafile() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_capath: ";
+    if (conf.mqtt_capath()) {
+        out << *conf.mqtt_capath() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_certfile: ";
+    if (conf.mqtt_certfile()) {
+        out << *conf.mqtt_certfile() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_keyfile: ";
+    if (conf.mqtt_keyfile()) {
+        out << *conf.mqtt_keyfile() << "\n";
+    } else {
+        out << "<none>\n";
+    }
+    out << "mqtt_tls_insecure: " << ((conf.mqtt_tls_insecure())?("true"):("false")) << "\n";
     out << "resolve_aliases: " << ((conf.resolve_aliases())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;
