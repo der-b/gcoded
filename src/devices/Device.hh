@@ -9,6 +9,8 @@
 #include <stdexcept>
 #include <mutex>
 #include <thread>
+#include "../EventLoop.hh"
+#include <iostream>
 
 class Detector;
 
@@ -16,7 +18,7 @@ class Detector;
  * This is an abstract representation of a device which accepts gcode for 
  * controlling.
  */
-class Device {
+class Device : public EventLoop::UserListener {
     public:
         enum class State {
             UNINITIALIZED = 0,
@@ -149,33 +151,76 @@ class Device {
         }
 
         virtual ~Device()
-        { }
+        {
+            if (m_user_event) {
+                m_user_event->disable();
+            }
+            m_user_event = nullptr;
+        }
+
+        virtual bool onTrigger(void) override
+        {
+            const std::lock_guard<std::mutex> guard(m_mutex);
+
+            if (!m_state_list.empty()) {
+                enum State new_state = m_state_list.front();
+                m_state_list.pop_front();
+                for (auto const &list: m_listeners) {
+                    list->on_state_change(*this, new_state);
+                }
+            } else if (m_progress_update) {
+                for (auto const &list: m_listeners) {
+                    list->on_build_progress_change(*this, m_progress_update->first, m_progress_update->second);
+                }
+                m_progress_update.reset();
+            }
+
+            if (!m_state_list.empty() || m_progress_update) {
+                if (m_user_event) {
+                    m_user_event->trigger();
+                }
+            } else if (State::SHUTDOWN == m_state) {
+                if (m_user_event) {
+                    m_user_event->disable();
+                }
+                m_user_event = nullptr;
+            }
+            clean_up_listeners();
+
+            return true;
+        }
 
     protected:
         Device()
             : m_state(State::UNINITIALIZED)
-        { }
+        {
+            m_user_event = EventLoop::get_event_loop().create_user_event(this);
+        }
 
         virtual void set_state(enum State new_state)
         {
             const std::lock_guard<std::mutex> guard(m_mutex);
             m_state = new_state;
-            for (auto const &list: m_listeners) {
-                // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
-                // TODO: Uncouple this, so that the callbacks runs on a normal thread
-                list->on_state_change(*this, m_state);
+            m_state_list.push_back(new_state);
+            // We do not call directly the listeners for state changes, since the device which calls
+            // this function might run on a realtime thread and we don't want to execute the listners
+            // on a real time thread. Therefore we inform a normal thread that there was a state change
+            // which calls the listeners.
+            if (m_user_event) {
+                m_user_event->trigger();
             }
-            clean_up_listeners();
         }
 
         void update_progress(unsigned percentage, unsigned remaining_time) {
             const std::lock_guard<std::mutex> guard(m_mutex);
-            for (auto const &list: m_listeners) {
-                // TODO: If the device runs on realtime thread, than the callbacks also runs on the same thread
-                // TODO: Uncouple this, so that the callbacks runs on a normal thread
-                list->on_build_progress_change(*this, percentage, remaining_time);
+            m_progress_update = std::pair<unsigned, unsigned>(percentage, remaining_time);
+            // We do not call directly the listeners for progress updates, since the device which calls
+            // this function might run on a realtime thread and we don't want to execute the listners
+            // on a real time thread. Therefore we inform a normal thread that there was a progress update
+            // which calls the listeners.
+            if (m_user_event) {
+                m_user_event->trigger();
             }
-            clean_up_listeners();
         }
 
     private:
@@ -218,6 +263,9 @@ class Device {
 
         std::mutex m_unregister_mutex;
         std::queue<Listener *> m_unregister_listeners;
+        std::shared_ptr<EventLoop::UserEvent> m_user_event;
+        std::list<enum State> m_state_list;
+        std::optional<std::pair<unsigned, unsigned>> m_progress_update;
 
         friend Detector;
 };

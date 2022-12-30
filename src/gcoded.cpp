@@ -31,13 +31,17 @@ int main(int argc, char **argv)
     }
 
     Detector &detec = Detector::get(conf);
-    Inotify &bla = Inotify::get();
-    Aliases aliases(conf);
-    Interface interface(conf, aliases);
+    {
+        Inotify &bla = Inotify::get();
+        Aliases aliases(conf);
+        Interface interface(conf, aliases);
 
-    while(running) {
-        sleep(1);
+        while(running) {
+            sleep(1);
+        }
     }
+
+    detec.shutdown();
 
     return 0;
 }

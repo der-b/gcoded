@@ -166,6 +166,16 @@ void PrusaDetector::register_on_new_device(Listener *list)
 
 
 /*
+ * unregister_on_new_device()
+ */
+void PrusaDetector::unregister_on_new_device(Listener *list)
+{
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    m_listeners.erase(list);
+}
+
+
+/*
  * on_fs_event()
  */
 void PrusaDetector::on_fs_event(const std::string &path, uint32_t event_type, const std::optional<std::string> &name)

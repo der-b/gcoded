@@ -24,7 +24,6 @@ DummyDevice::~DummyDevice()
     if (m_print_job.joinable()) {
         m_print_job.join();
     }
-    set_state(State::DISCONNECTED);
 }
 
 

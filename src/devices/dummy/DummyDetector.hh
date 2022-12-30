@@ -37,6 +37,7 @@ class DummyDetector : public Device::Listener {
          * this call has no effect.
          */
         void register_on_new_device(Listener *list);
+        void unregister_on_new_device(Listener *list);
         virtual void on_state_change(Device &device, enum Device::State new_state) override;
 
     private:

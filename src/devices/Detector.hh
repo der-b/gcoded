@@ -8,6 +8,7 @@
 #include <memory>
 #include <list>
 #include <functional>
+#include <condition_variable>
 
 /**
  * This class detects known devices
@@ -51,6 +52,8 @@ class Detector : public PrusaDetector::Listener, public Device::Listener, public
         void register_on_new_device(Listener *listener);
         void unregister_on_new_device(Listener *listener);
 
+        void shutdown();
+
     private:
         Detector(const Config &conf);
         void detect();
@@ -60,6 +63,8 @@ class Detector : public PrusaDetector::Listener, public Device::Listener, public
         std::list<std::shared_ptr<Device>> m_devices;
         const Config m_conf;
         std::set<Listener *> m_listeners;
+        bool m_shutdown_done;
+        std::condition_variable m_shutdown_cv;
 };
 
 #endif

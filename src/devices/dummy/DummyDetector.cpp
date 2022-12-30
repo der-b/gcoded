@@ -6,7 +6,6 @@
  */
 DummyDetector::DummyDetector()
 {
-    std::cout << "DummyDetector::" << __func__ << "()\n";
     std::shared_ptr<Device> dev = std::make_shared<DummyDevice>("StaticDummyDevice");
     dev->register_listener(this);
     m_devices.push_back(dev);
@@ -22,7 +21,6 @@ DummyDetector::DummyDetector()
 DummyDetector::~DummyDetector()
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
-    std::cout << "DummyDetector::" << __func__ << "()\n";
     for (auto &dev: m_devices) {
         dev->unregister_listener(this);
     }
@@ -35,7 +33,6 @@ DummyDetector::~DummyDetector()
 void DummyDetector::register_on_new_device(Listener *list)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
-    std::cout << "DummyDetector::" << __func__ << "()\n";
     m_listeners.insert(list);
     for (auto const &dev: m_devices) {
         list->on_new_dummy_device(dev);
@@ -44,11 +41,20 @@ void DummyDetector::register_on_new_device(Listener *list)
 
 
 /*
+ * unregister_on_new_device()
+ */
+void DummyDetector::unregister_on_new_device(Listener *list)
+{
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    m_listeners.erase(list);
+}
+
+
+/*
  * on_state_change()
  */
 void DummyDetector::on_state_change(Device &device, enum Device::State new_state)
 {
-    std::cout << "DummyDetector::" << __func__ << "()\n";
     if (device.is_valid()) {
         return;
     }

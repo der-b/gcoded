@@ -4,6 +4,7 @@
 #include <iostream>
 #include <event2/thread.h>
 #include <unistd.h>
+#include <algorithm>
 
 struct ReadCBHelperStruct {
     void *arg;
@@ -16,6 +17,13 @@ struct WriteCBHelperStruct {
     void *arg;
     bool (*onWrite)(int fd, void *arg);
     struct event *event;
+};
+
+
+struct UserCBHelperStruct {
+    EventLoop::UserListener *listener;
+    struct event *event;
+    std::shared_ptr<EventLoop::UserEvent> user_event;
 };
 
 void read_callback(evutil_socket_t fd, short what, void *arg) {
@@ -47,11 +55,25 @@ void write_callback(evutil_socket_t fd, short what, void *arg) {
     }
 }
 
+
+void user_callback(evutil_socket_t fd, short what, void *arg) {
+    UserCBHelperStruct *helper = static_cast<UserCBHelperStruct *>(arg);
+    if (helper->listener &&
+        helper->listener->onTrigger()) {
+        struct timeval timeout;
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        event_add(helper->event, &timeout);
+    }
+}
+
+
 /*
  * constructor()
  */
 EventLoop::EventLoop() 
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     evthread_use_pthreads();
     m_eb = event_base_new();
     if (!m_eb) {
@@ -69,6 +91,7 @@ EventLoop::EventLoop()
  */
 EventLoop::~EventLoop()
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     for(auto &event: m_write_events) {
         ReadCBHelperStruct *helper;
         event_get_assignment(event.second, NULL, NULL, NULL, NULL, (void **)&helper);
@@ -82,6 +105,14 @@ EventLoop::~EventLoop()
         event_free(helper->event);
         delete helper;
         close(event.first);
+    }
+    for(auto &event: m_user_events) {
+        UserCBHelperStruct *helper;
+        event_get_assignment(event, NULL, NULL, NULL, NULL, (void **)&helper);
+        helper->user_event->disable();
+        helper->user_event = nullptr;
+        event_free(helper->event);
+        delete helper;
     }
     if (event_base_loopexit(m_eb, NULL)) {
         std::cerr << "ERROR: event_base_loopexit() failed!\n";
@@ -101,6 +132,7 @@ EventLoop::~EventLoop()
  */
 void EventLoop::register_read_cb(int fd, bool (*onRead)(int fd, void *arg), void *arg)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     ReadCBHelperStruct *helper;
     if (m_read_events.end() != m_read_events.find(fd)) {
         event_get_assignment(m_read_events[fd], NULL, NULL, NULL, NULL, (void **)&helper);
@@ -125,6 +157,7 @@ void EventLoop::register_read_cb(int fd, bool (*onRead)(int fd, void *arg), void
  */
 void EventLoop::register_write_cb(int fd, bool (*onWrite)(int fd, void *arg), void *arg)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     WriteCBHelperStruct *helper;
     if (m_write_events.end() != m_write_events.find(fd)) {
         event_get_assignment(m_write_events[fd], NULL, NULL, NULL, NULL, (void **)&helper);
@@ -149,6 +182,7 @@ void EventLoop::register_write_cb(int fd, bool (*onWrite)(int fd, void *arg), vo
  */
 void EventLoop::unregister_read_cb(int fd)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     auto fd_entry = m_read_events.find(fd);
     if (fd_entry != m_read_events.end()) {
         m_read_events.erase(fd_entry);
@@ -161,9 +195,51 @@ void EventLoop::unregister_read_cb(int fd)
  */
 void EventLoop::unregister_write_cb(int fd)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     auto fd_entry = m_write_events.find(fd);
     if (fd_entry != m_write_events.end()) {
         m_write_events.erase(fd_entry);
+    }
+}
+
+
+/*
+ * create_user_event()
+ */
+std::shared_ptr<EventLoop::UserEvent> EventLoop::create_user_event(UserListener *listener)
+{
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    UserCBHelperStruct *helper;
+    helper = new UserCBHelperStruct();
+    helper->event = event_new(m_eb, -1, 0, user_callback, helper);
+    helper->listener = listener;
+    helper->user_event = std::make_shared<UserEvent>(helper->event, this);
+    m_user_events.push_back(helper->event);
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    event_add(helper->event, &timeout);
+
+    return helper->user_event;
+}
+
+
+/*
+ *
+ */
+void EventLoop::unregister_user_event(struct event *ev)
+{
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    auto event = std::find(m_user_events.begin(), m_user_events.end(), ev);
+    if (m_user_events.end() != event) {
+        UserCBHelperStruct *helper;
+        event_get_assignment(*event, NULL, NULL, NULL, NULL, (void **)&helper);
+        helper->user_event->disable();
+        helper->user_event = nullptr;
+        helper->listener = nullptr;
+        event_free(helper->event);
+        delete helper;
+        std::remove(m_user_events.begin(), m_user_events.end(), ev);
     }
 }
 
@@ -173,6 +249,7 @@ void EventLoop::unregister_write_cb(int fd)
  */
 void EventLoop::trigger_read_cb(int fd)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     auto event = m_read_events.find(fd);
     if (m_read_events.end() == event) {
         return;
@@ -187,6 +264,7 @@ void EventLoop::trigger_read_cb(int fd)
  */
 void EventLoop::trigger_write_cb(int fd)
 {
+    const std::lock_guard<std::mutex> guard(m_mutex);
     auto event = m_write_events.find(fd);
     if (m_write_events.end() == event) {
         return;
