@@ -97,6 +97,7 @@ void Config::set_default()
     m_mqtt_certfile = std::nullopt;
     m_mqtt_keyfile = std::nullopt;
     m_mqtt_tls_insecure = false;
+    m_use_realtime_scheduler = true;
     m_load_dummy = false;
     m_print_help = false;
     m_verbose = false;
@@ -345,6 +346,20 @@ void Config::load_config()
             m_mqtt_certfile = var_value;
         } else if ("mqtt_keyfile" == var_name) {
             m_mqtt_keyfile = var_value;
+        } else if ("use_realtime_scheduler") {
+            if (var_value != "true" && var_value != "false") {
+                std::string err = "Parsing error in '";
+                err += *m_conf_file;
+                err += "' on line ";
+                err += std::to_string(line_counter);
+                err += ": invalid value '";
+                err += var_value;
+                err += "' for variable '";
+                err += var_name;
+                err += "'. Allowed values are 'true' or 'false'.";
+                throw std::runtime_error(err);
+            }
+            m_use_realtime_scheduler = var_value == "true";
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
@@ -575,6 +590,7 @@ std::ostream& operator<<(std::ostream& out, const Config &conf)
         out << "<none>\n";
     }
     out << "mqtt_tls_insecure: " << ((conf.mqtt_tls_insecure())?("true"):("false")) << "\n";
+    out << "use_realtime_scheduler: " << ((conf.use_realtime_scheduler())?("true"):("false")) << "\n";
     out << "load_dummy: " << ((conf.load_dummy())?("true"):("false")) << "\n";
     out << "verbose: " << ((conf.verbose())?("true"):("false")) << "\n";
     return out;

@@ -71,7 +71,7 @@ void user_callback(evutil_socket_t fd, short what, void *arg) {
 /*
  * constructor()
  */
-EventLoop::EventLoop() 
+EventLoop::EventLoop(bool realtime)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     evthread_use_pthreads();
@@ -79,10 +79,34 @@ EventLoop::EventLoop()
     if (!m_eb) {
         throw std::runtime_error("Could not create an libevent event base!\n");
     }
-    
+
     m_worker = std::thread([this]() {
             event_base_loop(m_eb, EVLOOP_NO_EXIT_ON_EMPTY);
     });
+
+    if (realtime) {
+        sched_param sch;
+        int policy;
+        int max = sched_get_priority_max(SCHED_FIFO);
+        if (-1 == max) {
+            std::string error = "Failed to get max schedule priority for SCHED_FIFO: ";
+            error += std::strerror(errno);
+            throw std::runtime_error(error);
+        }
+        int min = sched_get_priority_min(SCHED_FIFO);
+        if (-1 == min) {
+            std::string error = "Failed to get mn schedule priority for SCHED_FIFO: ";
+            error += std::strerror(errno);
+            throw std::runtime_error(error);
+        }
+        pthread_getschedparam(m_worker.native_handle(), &policy, &sch);
+        sch.sched_priority = (min + max) / 2;
+        if (pthread_setschedparam(m_worker.native_handle(), SCHED_FIFO, &sch)) {
+            std::string error = "Failed to setschedparam: ";
+            error += std::strerror(errno);
+            throw std::runtime_error(error);
+        }
+    }
 }
 
 

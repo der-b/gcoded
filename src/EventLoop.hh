@@ -7,6 +7,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <cstring>
 
 class EventLoop {
     public:
@@ -68,20 +69,28 @@ class EventLoop {
         };
 
     public:
+        EventLoop() = delete;
         EventLoop(const EventLoop &) = delete;
         EventLoop(EventLoop &&) = delete;
         EventLoop &operator=(const EventLoop &) = delete;
 
-        static EventLoop &get_realtime_event_loop()
+        /**
+         * Returns an instance of the event loop whit an thread, which is executed by
+         * a realtime scheduler. If the parameter realtime is set to false, the function
+         * returns an event loop without a realtiem thread.
+         */
+        static EventLoop &get_realtime_event_loop(bool realtime = true)
         {
-            // TODO: add parameter, which starts the thread as realtime thread
-            static EventLoop el;
+            if (!realtime) {
+                return get_event_loop();
+            }
+            static EventLoop el(true);
             return el;
         }
 
         static EventLoop &get_event_loop()
         {
-            static EventLoop el;
+            static EventLoop el(false);
             return el;
         }
 
@@ -96,7 +105,7 @@ class EventLoop {
         void trigger_write_cb(int fd);
 
     private:
-        EventLoop();
+        EventLoop(bool realtime = false);
         ~EventLoop();
 
         void unregister_user_event(struct event *ev);

@@ -41,7 +41,7 @@ const std::regex __progress_regex(__PROGRESS_REGEX);
 PrusaDevice::PrusaDevice(const std::string &file, const std::string &name, const Config &conf)
     : m_device(file),
       m_name(name),
-      m_ev(EventLoop::get_realtime_event_loop()),
+      m_ev(EventLoop::get_realtime_event_loop(conf.use_realtime_scheduler())),
       m_fd(-1),
       m_send_lines(),
       m_sended_lines(),
