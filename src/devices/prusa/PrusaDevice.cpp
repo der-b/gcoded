@@ -315,11 +315,20 @@ void PrusaDevice::send_command_nl(const std::string &command,
                                   std::function<void(const std::string &line)> parse_line,
                                   std::function<void(const std::string &line)> finished)
 {
+    const bool is_empty = m_send_lines.empty();
     struct send_buf &sb = m_send_lines.emplace_back();
     sb.line = command + "\n";
     //std::cout << "send_command: " << command << "\n";
     sb.finished = finished;
     sb.parse_line = parse_line;
+
+    // it is important, that we only register the write callback if we didn't use an already
+    // registered write callback. If we would register a new one, while using the old one,
+    // than we mess up some memory (stack or heap) if the usage and registering happens on
+    // different threads.
+    if (!is_empty) {
+        return;
+    }
     m_ev.register_write_cb(m_fd, [](int fd, void *arg) -> bool {
             struct send_buf_helper *sb_helper = static_cast<struct send_buf_helper *>(arg);
             std::lock_guard<std::mutex> guard(sb_helper->mutex);
