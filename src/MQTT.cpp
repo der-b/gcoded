@@ -52,7 +52,7 @@ void on_disconnect(struct mosquitto *mosq, void *_data, int reason_code)
     // as required by the MQTT specification in section "3.1.4 CONNECT Actions"
     // github issue: https://github.com/eclipse/mosquitto/issues/2607
     if (0x8E == reason_code) {
-        std::cout << "Session takeover!\n";
+        std::cerr << "WARNING: MQTT session takeover. Another gcoded daemon with the same MQTT ClientID connected to the MQTT broker.\n";
     }
     //std::cout << "MQTT disconnect: " << mosquitto_reason_string(reason_code) << "(" << std::hex << reason_code << ")\n";
     m_cb_data.connected = false;
