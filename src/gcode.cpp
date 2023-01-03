@@ -66,8 +66,20 @@ int send(Client &client, const ConfigGcode &conf)
     std::atomic_int count = devices->size();
     // TODO: Print only for devices, which have an correct device state. This avoids sending gcode via network, which cant be printed anyway
     for (const auto &dev: *devices) {
-        client.print(dev, gcode, [&count](const Client::DeviceInfo &dev, Device::PrintResult res) {
-            std::cout << "print " << dev.provider << "/" << dev.name << " " << Device::printres_to_str(res) << "\n";
+        client.print(dev, gcode, [&count, &conf](const Client::DeviceInfo &dev, Device::PrintResult res) {
+            std::cout << "print ";
+            if (conf.resolve_aliases() && dev.provider_alias.size()) {
+                std::cout << dev.provider_alias;
+            } else {
+                std::cout << dev.provider;
+            }
+            std::cout << "/";
+            if (conf.resolve_aliases() && dev.device_alias.size()) {
+                std::cout << dev.device_alias;
+            } else {
+                std::cout << dev.name;
+            }
+            std::cout << " " << Device::printres_to_str(res) << "\n";
             count -= 1;
         });
     }
