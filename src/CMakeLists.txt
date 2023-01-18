@@ -1,4 +1,6 @@
-
+###
+### gcoded
+###
 add_executable(gcoded
                Config.cpp
                gcoded.cpp
@@ -29,6 +31,9 @@ target_link_libraries(gcoded
                       mosquitto
                       ${SQLite3_LIBRARY})
 
+###
+### gcode
+###
 add_executable(gcode
                ConfigGcode.cpp
                client/Client.cpp

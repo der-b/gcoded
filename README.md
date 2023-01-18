@@ -39,14 +39,23 @@ To compile this project you need following software packages:
 
 ### Download and compiling
 
+**Note:** It is assumed, that [systemd](https://systemd.io/) is used service manager.
+
 ``` bash
 git clone https://github.com/der-b/gcoded.git
 cd gcoded
 mkdir build
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release ..
 make
+cmake --install .
 ```
+
+The last command needs executed as superuser, since it sets up a new system user "gcoded" and sets CAP\_SYS\_NICE to "gcoded".
+
+If CMAKE\_BUILD\_TYPE is not set to Release, than the last command skips all steps which need superuser rights.
+In this case, but you should set the install prefix (--prefix) to a location which the current user can write to.
+
 
 ### MQTT Broker
 
@@ -58,14 +67,16 @@ as root with:
 systemctl start mosquitto
 ```
 
-### Start the Gcoded daemon
+### Start the Gcoded service
 
-Make sure, that you have a running MQTT broker on localhost.
-If the broker is on a different machine, than use the CLI option '-b' (see: './gcode --help').
+Make sure, that you have a running MQTT broker.
+If you use the default configuration, than the MQTT broker is expected to run on the localhost.
+The configuration can be found in [/etc/gcoded.conf](conf/gcoded.conf).
+
+Start the service with:
 
 ``` bash
-cd gcoded/build
-./gcoded
+systemctl start gcoded
 ```
 
 ### Using the client
@@ -73,23 +84,22 @@ cd gcoded/build
 List all detected devices:
 
 ``` bash
-cd gcoded/build
-./gcode list
+gcode list
 ```
 
 Send a G-code file to **_all_** available printers:
 
 ``` bash
-cd gcoded/bild
-./gcode send path/to/gcode_file.gcode
+gcode send path/to/gcode_file.gcode
 ```
 
 Send a G-code file to a specific device:
 
 ``` bash
-cd gcoded/bild
-./gcode send path/to/gcode_file.gcode DeviceName
+gcode send path/to/gcode_file.gcode DeviceName
 ```
+
+**Note:** *gcode* uses the MQTT broker defined in */etc/gcoded.conf* as default.
 
 ## Topic Collision Avoidance
 

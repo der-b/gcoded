@@ -1,0 +1,10 @@
+[Unit]
+Description=Gcoded exposes devices to MQTT, which can process G-code.
+Documentation=https://github.com/der-b/gcoded
+After=network.target
+
+[Service]
+Type=simple
+User=gcoded
+Group=gcoded
+ExecStart=${CMAKE_INSTALL_PREFIX}/bin/gcoded
