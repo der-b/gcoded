@@ -376,13 +376,13 @@ void PrusaDevice::parse_temp(const std::string &line)
     const auto end = line.end();
     while (std::regex_search(begin, end, m, __temp_regex)) {
         begin = begin + m.position() + m[0].length();
-        struct value readings;
+        struct SensorValue readings;
 
         std::string::size_type colon_pos = m[0].str().find(':');
         std::string::size_type slash_pos = m[0].str().find('/', colon_pos);
 
         std::string type = m[0].str().substr(0, colon_pos);
-        readings.actual_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
 
         if (std::string::npos != slash_pos) {
             readings.set_point = std::stod(m[0].str().substr(slash_pos+1));
@@ -411,7 +411,7 @@ void PrusaDevice::parse_pos(const std::string &line)
     const auto end = line.end();
     while (std::regex_search(begin, end, m, __pos_regex)) {
         begin = begin + m.position() + m[0].length();
-        struct value readings;
+        struct SensorValue readings;
 
         // After "Count" there are only debug values
         if ("Count " == m[0]) {
@@ -425,7 +425,7 @@ void PrusaDevice::parse_pos(const std::string &line)
         if (std::string::npos != space) {
             name = name.substr(0, space);
         }
-        readings.actual_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
 
         const std::lock_guard<std::mutex> guard(m_mutex);
         if ("X" == name) {
@@ -451,7 +451,7 @@ void PrusaDevice::parse_fan(const std::string &line)
     const auto end = line.end();
     while (std::regex_search(begin, end, m, __fan_regex)) {
         begin = begin + m.position() + m[0].length();
-        struct value readings;
+        struct SensorValue readings;
 
         // ignor power readings
         if (std::string::npos != m[0].str().find('@')) {
@@ -461,7 +461,7 @@ void PrusaDevice::parse_fan(const std::string &line)
         std::string::size_type colon_pos = m[0].str().find(':');
 
         std::string name = m[0].str().substr(0, colon_pos);
-        readings.actual_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
 
         const std::lock_guard<std::mutex> guard(m_mutex);
         m_sensor_readings["rpm_" + name] = readings;
@@ -469,7 +469,7 @@ void PrusaDevice::parse_fan(const std::string &line)
 
     /*
     for (const auto &read: m_sensor_readings) {
-        std::cout << read.first << " = " << read.second.actual_value;
+        std::cout << read.first << " = " << read.second.current_value;
         if (read.second.set_point) {
             std::cout << " / " << *read.second.set_point;
         }

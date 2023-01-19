@@ -112,7 +112,7 @@ class PrusaDevice : public Device {
         std::list<struct send_buf> m_send_lines;
         std::list<struct send_buf> m_sended_lines;
         std::list<std::string> m_capabilities;
-        std::map<std::string, struct value> m_sensor_readings;
+        std::map<std::string, struct SensorValue> m_sensor_readings;
         std::list<std::string> m_curr_print;
         std::function<void(const std::string &line)> m_print_helper;
         struct read_helper m_read_helper;

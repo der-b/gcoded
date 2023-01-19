@@ -8,18 +8,19 @@
 #include <queue>
 #include <stdexcept>
 #include <mutex>
-#include <thread>
 #include "../EventLoop.hh"
-#include <iostream>
 
 class Detector;
 
 /**
- * This is an abstract representation of a device which accepts gcode for 
+ * This is an abstract representation of a device which accepts gcode for
  * controlling.
  */
 class Device : public EventLoop::UserListener {
     public:
+        /**
+         * Device states.
+         */
         enum class State {
             UNINITIALIZED = 0,
             // device is used by another program
@@ -39,27 +40,13 @@ class Device : public EventLoop::UserListener {
             __LAST_ENTRY
         };
 
-        static const std::string &state_to_str(enum State state)
-        {
-            static const std::string states[] = { "UNINITIALIZED",
-                                                  "BUSY",
-                                                  "OK",
-                                                  "PRINTING",
-                                                  "ERROR",
-                                                  "DISCONNECTED",
-                                                  "INIT_DEVICE",
-                                                  "SHUTDOWN",
-                                                  "<UNKNOWN_STATE>" };
-            if (state > State::__LAST_ENTRY) {
-                state = State::__LAST_ENTRY;
-            }
-            return states[static_cast<size_t>(state)];
-        }
-
+        /**
+         * Possible results from printing attempt.
+         */
         enum class PrintResult {
-            // this is not intended to be returned by any funktion
+            // this is not intended to be returned by any function
             INVALID = 0,
-            // successfull execution
+            // successful execution
             OK = 1,
             // the device state does not allow to accept print jobs (see: is_valid())
             ERR_INVALID_STATE = 2,
@@ -72,25 +59,34 @@ class Device : public EventLoop::UserListener {
             __LAST_ENTRY
         };
 
-        static const std::string &printres_to_str(PrintResult res)
-        {
-            static const std::string results[] = { "INVALID", "OK", "ERR_INVLID_STATE", "ERR_PRINTING", "NET_ERR_NO_DEVICE", "NET_ERR_TIMEOUT", "<UNKNOWN_STATE>" };
-            if (res > PrintResult::__LAST_ENTRY) {
-                res = PrintResult::__LAST_ENTRY;
-            }
-            return results[static_cast<size_t>(res)];
-        }
-
+        /**
+         * Listener which can be registered to get status and print process updates.
+         */
         class Listener {
             public:
+                /**
+                 * Will be called, every time the device state changes.
+                 * It is guaranteed that this method is called for each state change and in the correct order.
+                 * It is not guaranteed that the method is called timely. That means that the device might be already
+                 * in another state while calling. This is due to the fact, that the device might run on a realtime
+                 * thread but we don't want to run the listeners on a realtime thread.
+                 *
+                 * @param device Handle to the device which is calling this method.
+                 * @param new_state The new state of the device.
+                 */
                 virtual void on_state_change(Device &device, enum State new_state) = 0;
 
                 /**
-                 * If the device is printing, this method is called when the gcoded receives a respnse on the
-                 * G-code M73 from the pritner.
+                 * Is called while printing and informs the callee about the current printing state.
+                 *
+                 * How it works:
+                 * If the device is printing, this method is called when the gcoded receives a response on the
+                 * G-code M73 from the printer.
                  * See: https://www.reprap.org/wiki/G-code#M73:_Set.2FGet_build_percentage
                  *
-                 * The unit of remaining_time is minutes.
+                 * @param device Handle to the device which is calling this method.
+                 * @param percentage of the current print
+                 * @patam remaining_time Estimated remaining time in minutes until print is finished.
                  */
                 virtual void on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time)
                 {}
@@ -98,97 +94,86 @@ class Device : public EventLoop::UserListener {
                 virtual ~Listener() {};
         };
 
-        struct value {
-            double actual_value;
+        /**
+         * Represents a sensor value of a device.
+         */
+        struct SensorValue {
+            // The current value from the sensor
+            double current_value;
+            // The set point, if this value is currently controlled by the device
             std::optional<double> set_point;
         };
 
-        State state() const {
-            return m_state;
-        }
+        /**
+         * Converts a device state into a printable string.
+         */
+        static const std::string &state_to_str(enum State state);
 
-        bool is_valid() const {
-            return    m_state != State::ERROR
-                   && m_state != State::DISCONNECTED
-                   && m_state != State::SHUTDOWN;
-        }
+        /**
+         * Converts a printing result into a printable string.
+         */
+        static inline const std::string &printres_to_str(PrintResult res);
 
-        void shutdown() {
-            set_state(State::SHUTDOWN);
-        }
+        /**
+         * Returns the current state of the device
+         */
+        State state() const { return m_state; }
 
-        /*
+        /**
+         * Returns true, if the device is an operational state.
+         * That means, interaction with the device is possible.
+         */
+        inline bool is_valid() const;
+
+        /**
+         * Allows to turn of the software control of the device.
+         * After calling this, the device will unregister the device and it will not
+         * be available until the device is physically reconnected.
+         */
+        void shutdown() { set_state(State::SHUTDOWN); }
+
+        /**
          * Returns an unique name of the device.
          */
         virtual const std::string &name() const = 0;
 
-        /*
-         * loads the gcode-file and send it to the printer.
+        /**
+         * Loads the G-Code file and send it to the printer.
          */
         virtual PrintResult print_file(const std::string &file_path) = 0;
 
-        /*
-         * interpretes the string as gcode and send it to the printer.
+        /**
+         * Interprets the string as G-Code and send it to the printer.
          */
         virtual PrintResult print(const std::string &gcode) = 0;
 
-        void register_listener(Listener *list)
-        {
-            {
-                const std::lock_guard<std::mutex> guard(m_mutex);
-                m_listeners.insert(list);
-            }
-            try_clean_up_listeners();
-        }
+        /**
+         * Registers a listener. On registration Listener::on_state_change() will
+         * be called to inform the listener on the actual state.
+         */
+        void register_listener(Listener *list);
 
-        void unregister_listener(Listener *list)
-        {
-            {
-                const std::lock_guard<std::mutex> guard(m_unregister_mutex);
-                m_unregister_listeners.push(list);
-            }
-            try_clean_up_listeners();
-        }
+        /**
+         * Unregisters a listener. If the given listener is not registered, than the call does nothing.
+         * Note, that the unregistering might not take place immediately. Another thread might currently
+         * call the listener. The unregistering happens, when it is made sure, that the Listener is not
+         * in use.
+         */
+        void unregister_listener(Listener *list);
 
-        virtual ~Device()
-        {
-            if (m_user_event) {
-                m_user_event->disable();
-            }
-            m_user_event = nullptr;
-        }
+        /**
+         * Destructor()
+         */
+        inline virtual ~Device();
 
-        virtual bool onTrigger(void) override
-        {
-            const std::lock_guard<std::mutex> guard(m_mutex);
-
-            if (!m_state_list.empty()) {
-                enum State new_state = m_state_list.front();
-                m_state_list.pop_front();
-                for (auto const &list: m_listeners) {
-                    list->on_state_change(*this, new_state);
-                }
-            } else if (m_progress_update) {
-                for (auto const &list: m_listeners) {
-                    list->on_build_progress_change(*this, m_progress_update->first, m_progress_update->second);
-                }
-                m_progress_update.reset();
-            }
-
-            if (!m_state_list.empty() || m_progress_update) {
-                if (m_user_event) {
-                    m_user_event->trigger();
-                }
-            } else if (State::SHUTDOWN == m_state) {
-                if (m_user_event) {
-                    m_user_event->disable();
-                }
-                m_user_event = nullptr;
-            }
-            clean_up_listeners();
-
-            return true;
-        }
+        /**
+         * This method checks, whether state changes happened or a printing process was changes.
+         * If so, than all listeners are called.
+         *
+         * You don't have to call this method. It is made sure that it is called internally.
+         * But it is safe to call it.
+         */
+        virtual bool onTrigger(void) override;
 
     protected:
         Device()
@@ -197,64 +182,29 @@ class Device : public EventLoop::UserListener {
             m_user_event = EventLoop::get_event_loop().create_user_event(this);
         }
 
-        virtual void set_state(enum State new_state)
-        {
-            const std::lock_guard<std::mutex> guard(m_mutex);
-            m_state = new_state;
-            m_state_list.push_back(new_state);
-            // We do not call directly the listeners for state changes, since the device which calls
-            // this function might run on a realtime thread and we don't want to execute the listners
-            // on a real time thread. Therefore we inform a normal thread that there was a state change
-            // which calls the listeners.
-            if (m_user_event) {
-                m_user_event->trigger();
-            }
-        }
+        /**
+         * Changes the device state and triggers all listeners in a thread safe manner.
+         */
+        virtual void set_state(enum State new_state);
 
-        void update_progress(unsigned percentage, unsigned remaining_time) {
-            const std::lock_guard<std::mutex> guard(m_mutex);
-            m_progress_update = std::pair<unsigned, unsigned>(percentage, remaining_time);
-            // We do not call directly the listeners for progress updates, since the device which calls
-            // this function might run on a realtime thread and we don't want to execute the listners
-            // on a real time thread. Therefore we inform a normal thread that there was a progress update
-            // which calls the listeners.
-            if (m_user_event) {
-                m_user_event->trigger();
-            }
-        }
+        /**
+         * Triggers all listeners in a thread safe manner about a printing progress update.
+         */
+        void update_progress(unsigned percentage, unsigned remaining_time);
 
     private:
-        void try_clean_up_listeners() {
-            if (m_mutex.try_lock()) {
-                try {
-                    clean_up_listeners();
-                } catch(...) {
-                    m_mutex.unlock();
-                    std::exception_ptr eptr = std::current_exception(); // capture
-                    try {
-                        std::rethrow_exception(eptr);
-                    } catch(const std::exception& e) {
-                        std::string error = "Caught exception: \"";
-                        error += e.what();
-                        error += "\"\n";
-                        throw std::runtime_error(error);
-                    }
-                }
-                m_mutex.unlock();
-            }
-        }
+        /**
+         * Tries to clean up listeners. If the needed mutex is locked, than no listener is clean up.
+         * Using this in Device::unregister_listener() allows to unregister listeners from inside of a
+         * listener method while being thread safe and without deadlocks.
+         */
+        void try_clean_up_listeners();
 
-        // WARNING: This fuction assumes, that m_mutex is already locked
-        void clean_up_listeners() {
-            const std::lock_guard<std::mutex> guard(m_unregister_mutex);
-            while (!m_unregister_listeners.empty()) {
-                m_listeners.erase(m_unregister_listeners.front());
-                m_unregister_listeners.pop();
-            }
-            if (m_on_listener_unregister) {
-                m_on_listener_unregister(m_listeners.size());
-            }
-        }
+        /**
+         * this function unregisters all listeners which are in the unregister queue.
+         * WARNING: This function assumes, that Device::m_mutex is already locked when called.
+         */
+        void clean_up_listeners();
 
         std::mutex m_mutex;
         State m_state;
@@ -270,4 +220,64 @@ class Device : public EventLoop::UserListener {
         friend Detector;
 };
 
+
+/*
+ * state_to_str()
+ */
+inline const std::string &Device::state_to_str(enum Device::State state)
+{
+    static const std::string states[] = { "UNINITIALIZED",
+                                          "BUSY",
+                                          "OK",
+                                          "PRINTING",
+                                          "ERROR",
+                                          "DISCONNECTED",
+                                          "INIT_DEVICE",
+                                          "SHUTDOWN",
+                                          "<UNKNOWN_STATE>" };
+    if (state > State::__LAST_ENTRY) {
+        state = State::__LAST_ENTRY;
+    }
+    return states[static_cast<size_t>(state)];
+}
+
+/*
+ * printres_to_str()
+ */
+inline const std::string &Device::printres_to_str(Device::PrintResult res)
+{
+    static const std::string results[] = { "INVALID",
+                                           "OK",
+                                           "ERR_INVALID_STATE",
+                                           "ERR_PRINTING",
+                                           "NET_ERR_NO_DEVICE",
+                                           "NET_ERR_TIMEOUT",
+                                           "<UNKNOWN_STATE>" };
+    if (res > PrintResult::__LAST_ENTRY) {
+        res = PrintResult::__LAST_ENTRY;
+    }
+    return results[static_cast<size_t>(res)];
+}
+
+/*
+ * is_valid()
+ */
+inline bool Device::is_valid() const {
+    return    m_state != State::UNINITIALIZED
+           && m_state != State::ERROR
+           && m_state != State::DISCONNECTED
+           && m_state != State::SHUTDOWN;
+}
+
+
+/*
+ * ~Device()
+ */
+inline Device::~Device()
+{
+    if (m_user_event) {
+        m_user_event->disable();
+    }
+    m_user_event = nullptr;
+}
 #endif

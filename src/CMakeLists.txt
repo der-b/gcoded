@@ -5,6 +5,7 @@ add_executable(gcoded
                Config.cpp
                gcoded.cpp
                EventLoop.cpp
+               devices/Device.cpp
                devices/Detector.cpp
                devices/prusa/PrusaDevice.cpp
                devices/prusa/PrusaDetector.cpp
