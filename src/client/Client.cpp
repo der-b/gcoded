@@ -558,7 +558,6 @@ void Client::print(const Client::DeviceInfo &dev, const std::string &gcode, std:
         return;
     }
 
-    // TODO: Strip out comment lines and trim each line to reduce the transferred size!
     MsgPrint print(gcode);
     std::pair<uint64_t, uint64_t> key{ print.request_code_part1(), print.request_code_part2() };
     // TODO: Make the timeout configurable!

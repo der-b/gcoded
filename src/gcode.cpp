@@ -61,7 +61,30 @@ int send(Client &client, const ConfigGcode &conf)
         std::cerr << "Failed to open file: " << filename << "\n";
         return 1;
     }
-    std::string gcode((std::istreambuf_iterator<char>(gcode_file)), (std::istreambuf_iterator<char>()));
+
+    auto trim = [](std::string &s) {
+        s.erase(0, s.find_first_not_of(" \n\r\t\f\v"));
+        s.erase(s.find_last_not_of(" \n\r\t\f\v") + 1);
+    };
+
+    std::string gcode;
+    // strip out all comments and blank lines.
+    while (!gcode_file.eof()) {
+        std::string line;
+        std::getline(gcode_file, line);
+        std::string::size_type pos = line.find(';');
+        if (std::string::npos != pos) {
+            line = line.substr(0, pos);
+        }
+        if (0 == line.size()) {
+            continue;
+        }
+        trim(line);
+        if (0 == line.size()) {
+            continue;
+        }
+        gcode += line + "\n";
+    }
 
     std::atomic_int count = devices->size();
     for (const auto &dev: *devices) {
