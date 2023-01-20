@@ -27,6 +27,12 @@ class PrusaDevice : public Device {
         {
             return m_name;
         }
+
+        std::map<std::string, struct SensorValue> sensor_readings() override
+        {
+            const std::lock_guard<std::mutex> guard(m_mutex);
+            return m_sensor_readings;
+        }
     protected:
         virtual void set_state(enum State new_state) override;
 

@@ -152,6 +152,14 @@ class Device : public EventLoop::UserListener {
         virtual PrintResult print(const std::string &gcode) = 0;
 
         /**
+         * returns all values from sensors of the device.
+         */
+        virtual std::map<std::string, struct SensorValue> sensor_readings()
+        {
+            return std::map<std::string, struct SensorValue>();
+        }
+
+        /**
          * Registers a listener. On registration Listener::on_state_change() will
          * be called to inform the listener on the actual state.
          */
