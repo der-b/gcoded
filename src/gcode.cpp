@@ -64,7 +64,6 @@ int send(Client &client, const ConfigGcode &conf)
     std::string gcode((std::istreambuf_iterator<char>(gcode_file)), (std::istreambuf_iterator<char>()));
 
     std::atomic_int count = devices->size();
-    // TODO: Print only for devices, which have an correct device state. This avoids sending gcode via network, which cant be printed anyway
     for (const auto &dev: *devices) {
         client.print(dev, gcode, [&count, &conf](const Client::DeviceInfo &dev, Device::PrintResult res) {
             std::cout << "print ";

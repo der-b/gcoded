@@ -551,6 +551,13 @@ std::unique_ptr<std::vector<Client::DeviceInfo>> Client::devices(const std::stri
 void Client::print(const Client::DeviceInfo &dev, const std::string &gcode, std::function<void(const DeviceInfo &dev, Device::PrintResult)> callback)
 {
     using namespace std::chrono_literals;
+
+    // TODO: Allow to skip this test
+    if (dev.state != Device::State::OK) {
+        callback(dev, Device::PrintResult::ERR_INVALID_STATE);
+        return;
+    }
+
     // TODO: Strip out comment lines and trim each line to reduce the transferred size!
     MsgPrint print(gcode);
     std::pair<uint64_t, uint64_t> key{ print.request_code_part1(), print.request_code_part2() };
