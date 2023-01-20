@@ -177,7 +177,7 @@ class Device : public EventLoop::UserListener {
          * You don't have to call this method. It is made sure that it is called internally.
          * But it is safe to call it.
          */
-        virtual bool onTrigger(void) override;
+        bool onTrigger(void) override;
 
     protected:
         Device()
