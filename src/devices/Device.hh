@@ -134,6 +134,10 @@ class Device : public EventLoop::UserListener {
 
         /**
          * Returns an unique name of the device.
+         * This name has to be unique for a provider.
+         * Furthermore, the name has to be permanent even after reboots.
+         * It is a good praxis to base this name on a serial number.
+         * See the section "Topic Collision Avoidance" in the README.md
          */
         virtual const std::string &name() const = 0;
 

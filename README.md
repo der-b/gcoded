@@ -116,6 +116,9 @@ If gcoded has not the necessary permission to read/write the file '/var/lib/gcod
 
 This ClientID is also used as unique identifier in the MQTT topics dedicated to a one gcoded daemon.
 
+Furthermore, it is required, that each device provides a permanent unique identifier.
+This is needed for assigning aliases to the devices (see. 'gcode alias --help').
+
 **Notice:** If a second client with the same ClientID connects to mosquitto, than first client will be disconnected.
 Since gcoded automatically reconnects after a connection loss, both clients will alternately connect and disconnect.
 If this happens, gcoded will generate a warning: *"WARNING: MQTT session takeover. Another gcoded daemon with the same MQTT ClientID connected to the MQTT broker."*
