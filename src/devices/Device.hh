@@ -15,6 +15,14 @@ class Detector;
 /**
  * This is an abstract representation of a device which accepts gcode for
  * controlling.
+ *
+ * An implementing device has to implement following functions:
+ * - name()
+ * - print_file()
+ * - print()
+ *
+ * Optionally it can implement:
+ * - sensor_readings()
  */
 class Device : public EventLoop::UserListener {
     public:
