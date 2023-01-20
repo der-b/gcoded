@@ -108,6 +108,8 @@ class Device : public EventLoop::UserListener {
         struct SensorValue {
             // The current value from the sensor
             double current_value;
+            // Unit of the value
+            std::optional<std::string> unit;
             // The set point, if this value is currently controlled by the device
             std::optional<double> set_point;
         };

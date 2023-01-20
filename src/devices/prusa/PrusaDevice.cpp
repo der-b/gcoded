@@ -383,6 +383,7 @@ void PrusaDevice::parse_temp(const std::string &line)
 
         std::string type = m[0].str().substr(0, colon_pos);
         readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.unit = "°C";
 
         if (std::string::npos != slash_pos) {
             readings.set_point = std::stod(m[0].str().substr(slash_pos+1));
@@ -426,6 +427,7 @@ void PrusaDevice::parse_pos(const std::string &line)
             name = name.substr(0, space);
         }
         readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.unit = "mm";
 
         const std::lock_guard<std::mutex> guard(m_mutex);
         if ("X" == name) {
@@ -451,6 +453,7 @@ void PrusaDevice::parse_fan(const std::string &line)
     const auto end = line.end();
     while (std::regex_search(begin, end, m, __fan_regex)) {
         begin = begin + m.position() + m[0].length();
+
         struct SensorValue readings;
 
         // ignor power readings
@@ -462,9 +465,10 @@ void PrusaDevice::parse_fan(const std::string &line)
 
         std::string name = m[0].str().substr(0, colon_pos);
         readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
+        readings.unit = "rpm";
 
         const std::lock_guard<std::mutex> guard(m_mutex);
-        m_sensor_readings["rpm_" + name] = readings;
+        m_sensor_readings["fan_" + name] = readings;
     }
 
     /*
