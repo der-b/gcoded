@@ -506,7 +506,7 @@ void PrusaDevice::parse_progress(const std::string &line)
  */
 Device::PrintResult PrusaDevice::print_file(const std::string &file_path)
 {
-    if (!is_valid()) {
+    if (state() != Device::State::OK) {
         return PrintResult::ERR_INVALID_STATE;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
@@ -548,7 +548,7 @@ Device::PrintResult PrusaDevice::print_file(const std::string &file_path)
  */
 Device::PrintResult PrusaDevice::print(const std::string &gcode)
 {
-    if (!is_valid()) {
+    if (state() != Device::State::OK) {
         return PrintResult::ERR_INVALID_STATE;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
