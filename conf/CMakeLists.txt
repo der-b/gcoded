@@ -1,7 +1,3 @@
-###
-### create user
-###
-install(CODE "execute_process(COMMAND useradd --no-create-home --system gcoded)")
 
 ###
 ### gcoded
@@ -9,15 +5,26 @@ install(CODE "execute_process(COMMAND useradd --no-create-home --system gcoded)"
 install(TARGETS gcoded
         TYPE RUNTIME)
 
+
 install(DIRECTORY
         CONFIGURATIONS Release
         DESTINATION /var/lib/gcoded
         DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-install(CODE "execute_process(COMMAND sh -c \"chown gcoded:gcoded /var/lib/gcoded || return 0\")")
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
 
-install(CODE
-        "execute_process(COMMAND sh -c \"setcap cap_sys_nice=+pe ./gcoded || echo \\\"WARNING: Could not set CAP_SYS_NICE capability on\\\" $<TARGET_FILE:gcoded> 1>&2\"
-                         WORKING_DIRECTORY \"${PROJECT_BUILD_DIR}\")")
+    ## set CAP_SYS_NICE capability to installed gcoded
+    install(CODE
+        "execute_process(COMMAND sh -c \"setcap cap_sys_nice=+pe $(which gcoded) || echo \\\"WARNING: Could not set CAP_SYS_NICE capability on\\\" $<TARGET_FILE:gcoded> 1>&2\"
+                             WORKING_DIRECTORY \"${PROJECT_BUILD_DIR}\")")
+
+
+    ## create gcoded user
+    install(CODE "execute_process(COMMAND useradd --no-create-home --system gcoded)")
+
+    ## set the correct user to the local state of the service
+    install(CODE "execute_process(COMMAND sh -c \"chown gcoded:gcoded /var/lib/gcoded || true\")")
+endif()
+
 
 ###
 ### gcoded
