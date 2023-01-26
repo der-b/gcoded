@@ -170,8 +170,7 @@ class Device : public EventLoop::UserListener {
         }
 
         /**
-         * Registers a listener. On registration Listener::on_state_change() will
-         * be called to inform the listener on the actual state.
+         * Registers a listener.
          */
         void register_listener(Listener *list);
 

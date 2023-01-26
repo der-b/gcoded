@@ -9,7 +9,6 @@ void Device::register_listener(Device::Listener *list)
     {
         const std::lock_guard<std::mutex> guard(m_mutex);
         m_listeners.insert(list);
-        list->on_state_change(*this, state());
     }
     try_clean_up_listeners();
 }
