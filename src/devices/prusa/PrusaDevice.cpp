@@ -71,7 +71,7 @@ PrusaDevice::~PrusaDevice()
  */
 void PrusaDevice::initialize()
 {
-    if (!is_valid()) {
+    if (!is_valid() && state() != Device::State::UNINITIALIZED) {
         return;
     }
     const std::lock_guard<std::mutex> guard(m_mutex);
