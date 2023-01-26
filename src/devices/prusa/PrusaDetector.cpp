@@ -38,7 +38,6 @@ void PrusaDetector::detect(std::list<std::shared_ptr<Device>> &devices)
 {
     using std::filesystem::directory_iterator;
 
-    std::lock_guard<std::mutex> guard(m_mutex);
     // iterate over all ttys
     for (const auto &dir: directory_iterator("/sys/class/tty/")) {
         std::filesystem::path candidate = dir;
@@ -126,27 +125,32 @@ void PrusaDetector::check_candidate(const std::string &filename)
         const std::string device_name = "prusa-" + line;
         const std::string device_file = "/dev/" + filename;
 
-        auto dev = std::find_if(m_devices.begin(), m_devices.end(), [&device_name](const std::shared_ptr<Device> &d) { return device_name == d->name(); });
-        if (dev == m_devices.end()) {
-            int fd = open(device_name.c_str(), O_RDWR | O_SYNC | O_NOCTTY | O_NONBLOCK);
-            if (fd < 0 && errno == EACCES) {
+        std::shared_ptr<Device> new_dev;
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            auto dev = std::find_if(m_devices.begin(), m_devices.end(), [&device_name](const std::shared_ptr<Device> &d) { return device_name == d->name(); });
+            if (dev == m_devices.end()) {
+                // Do we have the right to open the device? If not, than we do not create an PrusaDevice
+                int fd = open(device_name.c_str(), O_RDWR | O_SYNC | O_NOCTTY | O_NONBLOCK);
+                if (fd < 0 && errno == EACCES) {
+                    close(fd);
+                    return;
+                }
+                // We opened the device only to check whether we have the needed access rights
                 close(fd);
-                return;
-            }
-            close(fd);
 
-            std::shared_ptr<Device> new_dev = std::make_shared<PrusaDevice>(device_file, device_name, m_conf);
+                new_dev = std::make_shared<PrusaDevice>(device_file, device_name, m_conf);
 
-            new_dev->register_listener(this);
-
-            if (new_dev->is_valid()) {
-                m_devices.push_back(new_dev);
-                for (auto &listener: m_listeners) {
-                    listener->on_new_prusa_device(new_dev);
+                if (new_dev->is_valid()) {
+                    m_devices.push_back(new_dev);
+                    for (auto &listener: m_listeners) {
+                        listener->on_new_prusa_device(new_dev);
+                    }
                 }
             }
-
-            return;
+        }
+        if (new_dev && new_dev->is_valid()) {
+            new_dev->register_listener(this);
         }
     }
 }
@@ -192,7 +196,6 @@ void PrusaDetector::on_fs_event(const std::string &path, uint32_t event_type, co
         return;
     }
 
-    const std::lock_guard<std::mutex> guard(m_mutex);
     check_candidate(*name);
 }
 

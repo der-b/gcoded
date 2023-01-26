@@ -6,12 +6,13 @@
  */
 DummyDetector::DummyDetector()
 {
-    std::shared_ptr<Device> dev = std::make_shared<DummyDevice>("StaticDummyDevice");
-    dev->register_listener(this);
-    m_devices.push_back(dev);
-    dev = std::make_shared<DummyDevice>("StaticDummyDevice2");
-    dev->register_listener(this);
-    m_devices.push_back(dev);
+    std::shared_ptr<Device> dev1 = std::make_shared<DummyDevice>("StaticDummyDevice");
+    m_devices.push_back(dev1);
+    std::shared_ptr<Device> dev2 = std::make_shared<DummyDevice>("StaticDummyDevice2");
+    m_devices.push_back(dev2);
+
+    dev1->register_listener(this);
+    dev2->register_listener(this);
 }
 
 
