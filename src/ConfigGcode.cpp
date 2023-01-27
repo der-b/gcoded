@@ -345,6 +345,8 @@ void ConfigGcode::load_config()
             m_mqtt_certfile = var_value;
         } else if ("mqtt_keyfile" == var_name) {
             m_mqtt_keyfile = var_value;
+        } else if ("use_realtime_scheduler") {
+            // ignore: is only used for gcoded
         } else {
             std::string err = "Parsing error in '";
             err += *m_conf_file;
