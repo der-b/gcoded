@@ -28,7 +28,7 @@ Detector::~Detector()
 /*
  * on_new_prusa_device()
  */
-void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device) 
+void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "New prusa device: " << device->name() << "\n";
@@ -67,7 +67,7 @@ void Detector::on_new_prusa_device(const std::shared_ptr<Device> &device)
 /*
  * on_new_dummy_device()
  */
-void Detector::on_new_dummy_device(const std::shared_ptr<Device> &device) 
+void Detector::on_new_dummy_device(const std::shared_ptr<Device> &device)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
     std::cout << "New dummy device: " << device->name() << "\n";
@@ -156,6 +156,12 @@ void Detector::shutdown()
         if (!local_devices.empty()) {
             m_shutdown_done = false;
         }
+    }
+
+    if (local_devices.empty()) {
+        // if we do not have any local devices, the conditional variable will
+        // bock, therefor we skip it here.
+        return;
     }
 
     while (!local_devices.empty()) {

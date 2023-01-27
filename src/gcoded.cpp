@@ -32,7 +32,6 @@ int main(int argc, char **argv)
 
     Detector &detec = Detector::get(conf);
     {
-        Inotify &bla = Inotify::get();
         Aliases aliases(conf);
         Interface interface(conf, aliases);
 

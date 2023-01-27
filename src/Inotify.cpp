@@ -63,7 +63,14 @@ bool on_read(int fd, void *arg)
         return false;
     }
 
-    if (-1 == len && errno != EAGAIN) {
+    // Sometimes we get EBADF since we closed the file descriptor on a differen thread.
+    if (-1 == len && errno == EBADF) {
+        return false;
+    }
+
+    // We get EAGAIN since the fd is nonblocking
+    if (-1 == len && errno != EAGAIN && errno != EBADF) {
+        std::cout << strerror(errno) << "\n";;
         throw std::runtime_error("Inotify::on_read(): read() failed.");
     }
 
@@ -92,6 +99,7 @@ Inotify::Inotify()
 Inotify::~Inotify()
 {
     close(m_in_fd);
+    m_ev.unregister_read_cb(m_in_fd);
 }
 
 
