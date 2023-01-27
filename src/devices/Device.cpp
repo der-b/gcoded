@@ -33,6 +33,7 @@ void Device::unregister_listener(Device::Listener *list)
 bool Device::onTrigger(void)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
+    bool ret = true;
 
     if (!m_state_list.empty()) {
         enum State new_state = m_state_list.front();
@@ -51,15 +52,16 @@ bool Device::onTrigger(void)
         if (m_user_event) {
             m_user_event->trigger();
         }
-    } else if (State::SHUTDOWN == m_state) {
+    } else if (!is_valid()) {
         if (m_user_event) {
             m_user_event->disable();
         }
         m_user_event = nullptr;
+        ret = false;
     }
     clean_up_listeners();
 
-    return true;
+    return ret;
 }
 
 
@@ -69,7 +71,19 @@ bool Device::onTrigger(void)
 void Device::set_state(enum Device::State new_state)
 {
     const std::lock_guard<std::mutex> guard(m_mutex);
+    if (new_state == m_state){
+        return;
+    }
+
+    if (m_state == State::SHUTDOWN) {
+        std::string err = "Invalid state change on device '";
+        err += name();
+        err += "': You are not allowed to change the state of a device which is in SHUTDOWN.";
+        throw std::runtime_error(err);
+    }
+
     m_state = new_state;
+
     m_state_list.push_back(new_state);
     // We do not call directly the listeners for state changes, since the device which calls
     // this function might run on a realtime thread and we don't want to execute the listners

@@ -20,6 +20,7 @@ class Detector;
  * - name()
  * - print_file()
  * - print()
+ * - on_shutdown()
  *
  * Optionally it can implement:
  * - sensor_readings()
@@ -160,6 +161,12 @@ class Device : public EventLoop::UserListener {
          * Interprets the string as G-Code and send it to the printer.
          */
         virtual PrintResult print(const std::string &gcode) = 0;
+
+        /**
+         * This is called, if the device state changes to shutdown.
+         * This can be overriden by devices to turn of in a thread safe manner.
+         */
+        virtual void on_shutdown() {};
 
         /**
          * returns all values from sensors of the device.

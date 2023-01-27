@@ -33,6 +33,8 @@ class PrusaDevice : public Device {
             const std::lock_guard<std::mutex> guard(m_mutex);
             return m_sensor_readings;
         }
+
+        virtual void on_shutdown() override;
     protected:
         virtual void set_state(enum State new_state) override;
 

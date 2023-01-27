@@ -47,8 +47,8 @@ class EventLoop {
                         {
                             ev = m_ev;
                             el = m_el;
-                            ev = NULL;
-                            el = NULL;
+                            m_ev = NULL;
+                            m_el = NULL;
                         }
                         if (ev) {
                             el->unregister_user_event(ev);
@@ -112,7 +112,7 @@ class EventLoop {
         friend UserEvent;
 
     private:
-        std::mutex m_mutex;
+        std::recursive_mutex m_mutex;
         struct event_base *m_eb;
         std::thread        m_worker;
         std::map<int, struct event*> m_read_events;

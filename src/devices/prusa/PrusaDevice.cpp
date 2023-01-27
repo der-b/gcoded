@@ -57,12 +57,7 @@ PrusaDevice::PrusaDevice(const std::string &file, const std::string &name, const
  */
 PrusaDevice::~PrusaDevice()
 {
-    if (0 >= m_fd) {
-        m_ev.unregister_read_cb(m_fd);
-        m_ev.unregister_write_cb(m_fd);
-        close(m_fd);
-        m_fd = -1;
-    }
+    on_shutdown();
 }
 
 
@@ -582,6 +577,20 @@ Device::PrintResult PrusaDevice::print(const std::string &gcode)
     start_print();
 
     return PrintResult::OK;
+}
+
+
+/**
+ * on_shutdown()
+ */
+void PrusaDevice::on_shutdown()
+{
+    if (0 >= m_fd) {
+        m_ev.unregister_read_cb(m_fd);
+        m_ev.unregister_write_cb(m_fd);
+        close(m_fd);
+        m_fd = -1;
+    }
 }
 
 

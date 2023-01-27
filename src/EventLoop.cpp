@@ -73,7 +73,7 @@ void user_callback(evutil_socket_t fd, short what, void *arg) {
  */
 EventLoop::EventLoop(bool realtime)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     evthread_use_pthreads();
     m_eb = event_base_new();
     if (!m_eb) {
@@ -115,7 +115,7 @@ EventLoop::EventLoop(bool realtime)
  */
 EventLoop::~EventLoop()
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     for(auto &event: m_write_events) {
         ReadCBHelperStruct *helper;
         event_get_assignment(event.second, NULL, NULL, NULL, NULL, (void **)&helper);
@@ -156,7 +156,7 @@ EventLoop::~EventLoop()
  */
 void EventLoop::register_read_cb(int fd, bool (*onRead)(int fd, void *arg), void *arg)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     ReadCBHelperStruct *helper;
     if (m_read_events.end() != m_read_events.find(fd)) {
         event_get_assignment(m_read_events[fd], NULL, NULL, NULL, NULL, (void **)&helper);
@@ -181,7 +181,7 @@ void EventLoop::register_read_cb(int fd, bool (*onRead)(int fd, void *arg), void
  */
 void EventLoop::register_write_cb(int fd, bool (*onWrite)(int fd, void *arg), void *arg)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     WriteCBHelperStruct *helper;
     if (m_write_events.end() != m_write_events.find(fd)) {
         event_get_assignment(m_write_events[fd], NULL, NULL, NULL, NULL, (void **)&helper);
@@ -206,7 +206,7 @@ void EventLoop::register_write_cb(int fd, bool (*onWrite)(int fd, void *arg), vo
  */
 void EventLoop::unregister_read_cb(int fd)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     auto fd_entry = m_read_events.find(fd);
     if (fd_entry != m_read_events.end()) {
         m_read_events.erase(fd_entry);
@@ -219,7 +219,7 @@ void EventLoop::unregister_read_cb(int fd)
  */
 void EventLoop::unregister_write_cb(int fd)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     auto fd_entry = m_write_events.find(fd);
     if (fd_entry != m_write_events.end()) {
         m_write_events.erase(fd_entry);
@@ -232,7 +232,7 @@ void EventLoop::unregister_write_cb(int fd)
  */
 std::shared_ptr<EventLoop::UserEvent> EventLoop::create_user_event(UserListener *listener)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     UserCBHelperStruct *helper;
     helper = new UserCBHelperStruct();
     helper->event = event_new(m_eb, -1, 0, user_callback, helper);
@@ -253,17 +253,18 @@ std::shared_ptr<EventLoop::UserEvent> EventLoop::create_user_event(UserListener 
  */
 void EventLoop::unregister_user_event(struct event *ev)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     auto event = std::find(m_user_events.begin(), m_user_events.end(), ev);
     if (m_user_events.end() != event) {
         UserCBHelperStruct *helper;
         event_get_assignment(*event, NULL, NULL, NULL, NULL, (void **)&helper);
-        helper->user_event->disable();
+        event_del_block(helper->event);
         helper->user_event = nullptr;
         helper->listener = nullptr;
         event_free(helper->event);
         delete helper;
-        std::remove(m_user_events.begin(), m_user_events.end(), ev);
+        auto new_end = std::remove(m_user_events.begin(), m_user_events.end(), ev);
+        m_user_events.erase(new_end, m_user_events.end());
     }
 }
 
@@ -273,7 +274,7 @@ void EventLoop::unregister_user_event(struct event *ev)
  */
 void EventLoop::trigger_read_cb(int fd)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     auto event = m_read_events.find(fd);
     if (m_read_events.end() == event) {
         return;
@@ -288,7 +289,7 @@ void EventLoop::trigger_read_cb(int fd)
  */
 void EventLoop::trigger_write_cb(int fd)
 {
-    const std::lock_guard<std::mutex> guard(m_mutex);
+    const std::lock_guard<std::recursive_mutex> guard(m_mutex);
     auto event = m_write_events.find(fd);
     if (m_write_events.end() == event) {
         return;
