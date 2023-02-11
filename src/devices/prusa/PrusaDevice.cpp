@@ -78,6 +78,7 @@ void PrusaDevice::initialize()
     set_state(State::INIT_DEVICE);
     m_pstate = DEVICE_NOT_READY;
 
+    // skip the rest, if we have allready an connection to the printer
     if (0 <= m_fd) {
         return;
     }
@@ -189,11 +190,11 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
         {
             const std::lock_guard<std::mutex> guard(m_mutex);
             if (!m_sended_lines.empty()) {
-            finished_buf = m_sended_lines.front();
+                finished_buf = m_sended_lines.front();
+                m_sended_lines.pop_front();
             } else {
                 std::cerr << "Got ok, but didn't have commands in the queue!";
             }
-            m_sended_lines.pop_front();
         }
         if (finished_buf.finished) {
             finished_buf.finished(finished_buf.line);
@@ -203,6 +204,7 @@ void PrusaDevice::onReadedLine(const std::string &readed_line)
     } else if (0 == readed_line.compare(0, std::strlen("echo:Unknown command:"), "echo:Unknown command:")) {
         const std::lock_guard<std::mutex> guard(m_mutex);
         std::cerr << "Error: Command is not known by printer: " << m_sended_lines.front().line << std::endl;
+        // TODO: Sending an invalid gcode command kills gocoded completely ... fix this!
         throw std::runtime_error("Sended an command to printer, which the printer does not know!");
     }
 
@@ -255,6 +257,7 @@ void PrusaDevice::change_pstate(enum prusa_state pstate)
 
     switch (m_pstate) {
         case DEVICE_ACCEPTS_COMMANDS:
+            // get firmware version and capabilities
             send_command_nl("M115",
                             [this](const std::string &read_line) {
                                 if (0 != read_line.compare(0, 4, "Cap:")) {
@@ -284,6 +287,7 @@ void PrusaDevice::change_pstate(enum prusa_state pstate)
                                         }
                                     }
                                 }
+                                // enable autoreporting of senser readings
                                 std::string command = "M155 S2 C";
                                 command += std::to_string(bitmap);
                                 send_command_nl(command,
