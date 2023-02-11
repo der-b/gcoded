@@ -26,6 +26,10 @@ The usage of topic within MQTT makes it necessary to implement a topic collision
 See section [Topic Collision Avoidance](#topic-collision-avoidance) for more information.
 
 And this is a good opportunity to play around with the realtime scheduler which was introduces in the Linux kernel 2.6.26 (see 'man 7 sched').
+The interfacing with the devices (i.e. 3D printers) are running on a realtime thread.
+This protects the printing from other computing intensive tasks so that the printing itself will not be disturbed.
+The network interfacing to gcoded does not run in a realtime thread.
+Therefore it could be, that the gcoded does not react to network request, but is still printing normally.
 
 ## Getting started
 
@@ -39,7 +43,7 @@ To compile this project you need following software packages:
 
 ### Download and compiling
 
-**Note:** It is assumed, that [systemd](https://systemd.io/) is used service manager.
+**Note:** It is assumed, that [systemd](https://systemd.io/) is the used service manager.
 
 ``` bash
 git clone https://github.com/der-b/gcoded.git
@@ -51,15 +55,14 @@ make
 cmake --install .
 ```
 
-The last command needs executed as superuser, since it sets up a new system user "gcoded" and sets CAP\_SYS\_NICE to "gcoded".
+The last command needs to be executed as superuser, since it sets up a new system user "gcoded" and sets CAP\_SYS\_NICE to "gcoded".
 
 If CMAKE\_BUILD\_TYPE is not set to Release, than the last command skips all steps which need superuser rights.
-In this case, but you should set the install prefix (--prefix) to a location which the current user can write to.
-
+In this case, you should set the install prefix (--prefix) to a location to which the current user can write to.
 
 ### MQTT Broker
 
-You need a running MQTT Broker. Gcoded was is tested with [Mosquitto](https://mosquitto.org/). For the examples below, we assume
+You need a running MQTT Broker. Gcoded is tested with [Mosquitto](https://mosquitto.org/). For the examples below, we assume
 that the MQTT broker runs on localhost on the default port 1883. Depending on the used Linux Distribution you can start Mosquitto
 as root with:
 
