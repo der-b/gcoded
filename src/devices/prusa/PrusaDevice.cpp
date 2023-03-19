@@ -455,7 +455,7 @@ void PrusaDevice::parse_fan(const std::string &line)
 
         struct SensorValue readings;
 
-        // ignor power readings
+        // ignore power readings
         if (std::string::npos != m[0].str().find('@')) {
             continue;
         }
@@ -469,6 +469,7 @@ void PrusaDevice::parse_fan(const std::string &line)
         const std::lock_guard<std::mutex> guard(m_mutex);
         m_sensor_readings["fan_" + name] = readings;
     }
+    update_sensor_readings();
 
     /*
     for (const auto &read: m_sensor_readings) {

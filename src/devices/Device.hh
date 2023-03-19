@@ -69,6 +69,18 @@ class Device : public EventLoop::UserListener {
         };
 
         /**
+         * Represents a sensor value of a device.
+         */
+        struct SensorValue {
+            // The current value from the sensor
+            double current_value;
+            // Unit of the value
+            std::optional<std::string> unit;
+            // The set point, if this value is currently controlled by the device
+            std::optional<double> set_point;
+        };
+
+        /**
          * Listener which can be registered to get status and print process updates.
          */
         class Listener {
@@ -100,19 +112,15 @@ class Device : public EventLoop::UserListener {
                 virtual void on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time)
                 {}
 
-                virtual ~Listener() {};
-        };
 
-        /**
-         * Represents a sensor value of a device.
-         */
-        struct SensorValue {
-            // The current value from the sensor
-            double current_value;
-            // Unit of the value
-            std::optional<std::string> unit;
-            // The set point, if this value is currently controlled by the device
-            std::optional<double> set_point;
+                /**
+                 * Is called when new sensor readings are available.
+                 * Use Device::sensor_readings() to access all values.
+                 */
+                virtual void on_sensor_update(Device &device)
+                {}
+
+                virtual ~Listener() {};
         };
 
         /**
@@ -220,6 +228,11 @@ class Device : public EventLoop::UserListener {
          */
         void update_progress(unsigned percentage, unsigned remaining_time);
 
+        /**
+         * Informs all listeners about new sensor readings.
+         */
+        void update_sensor_readings();
+
     private:
         /**
          * Tries to clean up listeners. If the needed mutex is locked, than no listener is clean up.
@@ -244,6 +257,7 @@ class Device : public EventLoop::UserListener {
         std::shared_ptr<EventLoop::UserEvent> m_user_event;
         std::list<enum State> m_state_list;
         std::optional<std::pair<unsigned, unsigned>> m_progress_update;
+        bool m_sensor_reading_update;
 
         friend Detector;
 };

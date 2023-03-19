@@ -46,6 +46,11 @@ bool Device::onTrigger(void)
             list->on_build_progress_change(*this, m_progress_update->first, m_progress_update->second);
         }
         m_progress_update.reset();
+    } else if (m_sensor_reading_update) {
+        for (auto const &list: m_listeners) {
+            list->on_sensor_update(*this);
+        }
+        m_sensor_reading_update = false;
     }
 
     if (!m_state_list.empty() || m_progress_update) {
@@ -103,6 +108,23 @@ void Device::update_progress(unsigned percentage, unsigned remaining_time)
     const std::lock_guard<std::mutex> guard(m_mutex);
     m_progress_update = std::pair<unsigned, unsigned>(percentage, remaining_time);
     // We do not call directly the listeners for progress updates, since the device which calls
+    // this function might run on a realtime thread and we don't want to execute the listners
+    // on a real time thread. Therefore we inform a normal thread that there was a progress update
+    // which calls the listeners.
+    if (m_user_event) {
+        m_user_event->trigger();
+    }
+}
+
+
+/*
+ * update_sensor_readings()
+ */
+void Device::update_sensor_readings()
+{
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    m_sensor_reading_update = true;
+    // We do not call directly the listeners, since the device which calls
     // this function might run on a realtime thread and we don't want to execute the listners
     // on a real time thread. Therefore we inform a normal thread that there was a progress update
     // which calls the listeners.
