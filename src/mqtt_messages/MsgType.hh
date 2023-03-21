@@ -14,9 +14,10 @@ class MsgType : public Msg {
             ALIASES = 5,
             ALIASES_SET = 6,
             ALIASES_SET_PROVIDER = 7,
+            SENSOR_READINGS = 8,
             // this entry needs to be the last element and needs a number which is higher
             // by one compared to the previous enty
-            __LAST_ENTRY = 8
+            __LAST_ENTRY = 9
         };
 
         struct header_msg {

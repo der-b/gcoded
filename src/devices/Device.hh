@@ -322,4 +322,16 @@ inline Device::~Device()
     }
     m_user_event = nullptr;
 }
+
+
+/*
+ * opertor==()
+ */
+inline bool operator==(const Device::SensorValue &a, const Device::SensorValue &b)
+{
+    return    a.current_value == b.current_value
+           && a.set_point == b.set_point
+           && a.unit == b.unit;
+}
+
 #endif

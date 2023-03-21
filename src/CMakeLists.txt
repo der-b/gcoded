@@ -22,6 +22,7 @@ add_executable(gcoded
                mqtt_messages/MsgAliases.cpp
                mqtt_messages/MsgAliasesSet.cpp
                mqtt_messages/MsgAliasesSetProvider.cpp
+               mqtt_messages/MsgSensorReadings.cpp
                mqtt_messages/MsgType.cpp)
 
 target_link_libraries(gcoded
