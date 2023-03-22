@@ -22,11 +22,18 @@ class DummyDevice : public Device {
         {
             return m_device;
         }
+
+        virtual std::map<std::string, struct Device::SensorValue> sensor_readings() override
+        {
+            return m_sensor_readings;
+        }
     private:
         std::string m_device;
         std::mutex m_mutex;
         std::list<std::string> m_curr_print;
         std::thread m_print_job;
+        std::thread m_sensor_readings_job;
+        std::map<std::string, Device::SensorValue> m_sensor_readings;
         size_t m_commands;
         int m_progress;
         int m_remaining_time;

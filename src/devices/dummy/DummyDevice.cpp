@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
+#include <unistd.h>
 
 
 /*
@@ -12,6 +13,36 @@ DummyDevice::DummyDevice(const std::string &name)
       m_running(true)
 {
     set_state(State::OK);
+    m_sensor_readings_job = std::thread([this]() {
+                Device::SensorValue sv;
+                sv.current_value = 1.1;
+                sv.unit = "m";
+                sv.set_point = 2.2;
+                m_sensor_readings["first"] = sv;
+                sv.current_value = 3.3;
+                sv.unit = "m/s";
+                sv.set_point.reset();
+                m_sensor_readings["second"] = sv;
+                sv.current_value = 4.4;
+                sv.unit.reset();
+                sv.set_point = 5.5;
+                m_sensor_readings["third"] = sv;
+                sv.current_value = 4.4;
+                sv.unit.reset();
+                sv.set_point.reset();
+                m_sensor_readings["forth"] = sv;
+
+                while(m_running) {
+                    update_sensor_readings();
+                    for (auto it = m_sensor_readings.begin(); it != m_sensor_readings.end(); it++) {
+                        it->second.current_value *= 1.01;
+                        if (it->second.set_point) {
+                            (*it->second.set_point) *= 1.01;
+                        }
+                    }
+                    sleep(1);
+                }
+            });
 }
 
 
@@ -23,6 +54,9 @@ DummyDevice::~DummyDevice()
     m_running = false;
     if (m_print_job.joinable()) {
         m_print_job.join();
+    }
+    if (m_sensor_readings_job.joinable()) {
+        m_sensor_readings_job.join();
     }
 }
 
