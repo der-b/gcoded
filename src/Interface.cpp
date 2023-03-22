@@ -3,6 +3,7 @@
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
+#include "mqtt_messages/MsgSensorReadings.hh"
 #include "mqtt_messages/MsgAliases.hh"
 #include "mqtt_messages/MsgAliasesSet.hh"
 #include "mqtt_messages/MsgAliasesSetProvider.hh"
@@ -170,6 +171,28 @@ void Interface::on_build_progress_change(Device &device, unsigned percentage, un
     m_retain_topics.insert(topic);
 }
 
+
+/*
+ * on_sensor_update()
+ */
+void Interface::on_sensor_update(Device &device) 
+{
+    std::string topic = m_conf.mqtt_prefix() + "/clients/" + m_conf.mqtt_client_id() + "/" + device.name() + "/sensor_readings";
+    MsgSensorReadings sr;
+    std::vector<char> buf;
+    for (const auto &value: device.sensor_readings()) {
+        sr.add_sensor_reading(value.first, value.second);
+    }
+    sr.encode(buf);
+    m_mqtt.publish_retained(topic, buf);
+    const std::lock_guard<std::mutex> guard(m_mutex);
+    m_retain_topics.insert(topic);
+}
+
+
+/*
+ * on_alias_change()
+ */
 void Interface::on_alias_change()
 {
     std::map<std::string, std::string> aliases;

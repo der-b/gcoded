@@ -116,6 +116,8 @@ class Device : public EventLoop::UserListener {
                 /**
                  * Is called when new sensor readings are available.
                  * Use Device::sensor_readings() to access all values.
+                 *
+                 * @param device Handle to the device which is calling this method.
                  */
                 virtual void on_sensor_update(Device &device)
                 {}

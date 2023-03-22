@@ -19,6 +19,7 @@ class Interface : public Detector::Listener, public Device::Listener, public MQT
         virtual void on_new_device(const std::shared_ptr<Device> &dev) override;
         virtual void on_state_change(Device &device, enum Device::State new_state) override;
         virtual void on_build_progress_change(Device &device, unsigned percentage, unsigned remaining_time) override;
+        virtual void on_sensor_update(Device &device) override;
         virtual void on_message(const char *topic, const char *payload, size_t payload_len) override;
         virtual void on_alias_change() override;
     
