@@ -6,6 +6,7 @@
 #include "mqtt_messages/MsgPrint.hh"
 #include "mqtt_messages/MsgPrintResponse.hh"
 #include "mqtt_messages/MsgPrintProgress.hh"
+#include "mqtt_messages/MsgSensorReadings.hh"
 #include "mqtt_messages/MsgAliases.hh"
 #include "mqtt_messages/MsgAliasesSet.hh"
 #include "mqtt_messages/MsgAliasesSetProvider.hh"
@@ -75,15 +76,39 @@ Client::Client(const ConfigGcode &conf)
         }
     }
 
+    { // create sensor readings table
+        std::string s_stmt = "CREATE TABLE sensor_readings "
+                             "( "
+                             "provider TEXT, "
+                             "device TEXT, "
+                             "sensor_name TEXT, "
+                             "current_value REAL NOT NULL, "
+                             "set_point REAL DEFAULT NULL, "
+                             "unit TEXT DEFAULT NULL, "
+                             "PRIMARY KEY (provider, device, sensor_name)"
+                             ")";
+        ret = sqlite3_exec(m_db, s_stmt.c_str(), NULL, NULL, NULL);
+
+        if (SQLITE_OK != ret) {
+            std::string err = "Client::Client(): Failed create table sensor_readings: ";
+            err += sqlite3_errmsg(m_db);
+            sqlite3_close(m_db);
+            m_db = nullptr;
+            throw std::runtime_error(err);
+        }
+    }
+
     m_mqtt.register_listener(this);
 
     std::string state_topic = conf.mqtt_prefix() + "/clients/+/+/state";
     std::string print_topic = conf.mqtt_prefix() + "/clients/+/+/print_response";
     std::string print_progress_topic = conf.mqtt_prefix() + "/clients/+/+/print_progress";
+    std::string sensor_readings_topic = conf.mqtt_prefix() + "/clients/+/+/sensor_readings";
     std::string aliases_topic = conf.mqtt_prefix() + "/aliases/+";
     m_mqtt.subscribe(state_topic);
     m_mqtt.subscribe(print_topic);
     m_mqtt.subscribe(print_progress_topic);
+    m_mqtt.subscribe(sensor_readings_topic);
     m_mqtt.subscribe(aliases_topic);
 
     m_mqtt.start();
@@ -135,6 +160,7 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
     const std::string state_postfix = "/state";
     const std::string print_postfix = "/print_response";
     const std::string print_progress_postfix = "/print_progress";
+    const std::string sensor_readings_postfix = "/sensor_readings";
 
     if (0 == prefix.compare(0, prefix.size(), topic, prefix.size())) {
         if (   0 <= std::strlen(topic) - state_postfix.size()
@@ -314,6 +340,137 @@ void Client::on_message(const char *topic, const char *payload, size_t payload_l
 
             sqlite3_finalize(stmt);
 
+
+        } else if (   0 <= std::strlen(topic) - sensor_readings_postfix.size()
+                   && 0 == sensor_readings_postfix.compare(0, sensor_readings_postfix.size(), topic + std::strlen(topic) - sensor_readings_postfix.size())) {
+            const char *first = topic + prefix.size();
+            const char *last = topic + std::strlen(topic) - sensor_readings_postfix.size();
+            const char *pos = std::find(first, last, '/');
+            if (pos >= last) {
+                std::cerr << "Unexpected topic format: " << topic << "\n";
+                return;
+            }
+            const std::string provider(first, pos);
+            const std::string device(pos+1, last);
+
+            const std::vector<char> msg_buf(payload, payload + payload_len);
+            MsgSensorReadings msg_sensor_readings;
+            msg_sensor_readings.decode(msg_buf);
+
+            sqlite3_stmt *stmt;
+            std::string s_stmt = "INSERT INTO sensor_readings (provider, "
+                                                              "device, "
+                                                              "sensor_name, "
+                                                              "current_value, "
+                                                              "set_point, "
+                                                              "unit) "
+                                 "VALUES (?1, ?2, ?3, ?4, ?5, ?6) "
+                                 "ON CONFLICT (provider, device, sensor_name) DO UPDATE SET current_value = ?4, set_point = ?5, unit = ?6";
+            int ret = sqlite3_prepare_v2(m_db,
+                                         s_stmt.data(),
+                                         s_stmt.size(),
+                                         &stmt,
+                                         NULL);
+            if (SQLITE_OK != ret) {
+                sqlite3_finalize(stmt);
+                std::string err = "Client::on_message(): Failed prepare INSERT statement: ";
+                err += sqlite3_errmsg(m_db);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 1, provider.data(), provider.size(), NULL);
+            if (SQLITE_OK != ret) {
+                std::string err = "Client::on_message(): Failed to bind provider parameter: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            ret = sqlite3_bind_text(stmt, 2, device.data(), device.size(), NULL);
+            if (SQLITE_OK != ret) {
+                std::string err = "Client::on_message(): Failed to bind device parameter: ";
+                err += sqlite3_errmsg(m_db);
+                sqlite3_finalize(stmt);
+                throw std::runtime_error(err);
+            }
+
+            for (const auto &sr: msg_sensor_readings.sensor_readings()) {
+                ret = sqlite3_bind_text(stmt, 3, sr.first.data(), sr.first.size(), NULL);
+                if (SQLITE_OK != ret) {
+                    std::string err = "Client::on_message(): Failed to bind sensor_name parameter: ";
+                    err += sqlite3_errmsg(m_db);
+                    sqlite3_finalize(stmt);
+                    throw std::runtime_error(err);
+                }
+
+                ret = sqlite3_bind_double(stmt, 4, sr.second.current_value);
+                if (SQLITE_OK != ret) {
+                    std::string err = "Client::on_message(): Failed to bind current_value parameter: ";
+                    err += sqlite3_errmsg(m_db);
+                    sqlite3_finalize(stmt);
+                    throw std::runtime_error(err);
+                }
+
+                if (sr.second.set_point) {
+                    ret = sqlite3_bind_double(stmt, 5, *sr.second.set_point);
+                    if (SQLITE_OK != ret) {
+                        std::string err = "Client::on_message(): Failed to bind set_point parameter: ";
+                        err += sqlite3_errmsg(m_db);
+                        sqlite3_finalize(stmt);
+                        throw std::runtime_error(err);
+                    }
+                } else {
+                    ret = sqlite3_bind_null(stmt, 5);
+                    if (SQLITE_OK != ret) {
+                        std::string err = "Client::on_message(): Failed to bind set_point parameter: ";
+                        err += sqlite3_errmsg(m_db);
+                        sqlite3_finalize(stmt);
+                        throw std::runtime_error(err);
+                    }
+                }
+
+                if (sr.second.unit) {
+                    ret = sqlite3_bind_text(stmt, 6, sr.second.unit->data(), sr.second.unit->size(), NULL);
+                    if (SQLITE_OK != ret) {
+                        std::string err = "Client::on_message(): Failed to bind unit parameter: ";
+                        err += sqlite3_errmsg(m_db);
+                        sqlite3_finalize(stmt);
+                        throw std::runtime_error(err);
+                    }
+                } else {
+                    ret = sqlite3_bind_null(stmt, 6);
+                    if (SQLITE_OK != ret) {
+                        std::string err = "Client::on_message(): Failed to bind unit parameter: ";
+                        err += sqlite3_errmsg(m_db);
+                        sqlite3_finalize(stmt);
+                        throw std::runtime_error(err);
+                    }
+                }
+
+                ret = sqlite3_step(stmt);
+                if (SQLITE_CONSTRAINT == ret) {
+                    std::string err = "Client::on_message(): Constraint error while execuion of INSERT statment: ";
+                    err += sqlite3_errmsg(m_db);
+                    sqlite3_finalize(stmt);
+                    throw std::runtime_error(err);
+                }
+
+                if (SQLITE_DONE != ret) {
+                    std::string err = "Client::on_message(): Execution of the INSERT statment failed: ";
+                    err += sqlite3_errmsg(m_db);
+                    sqlite3_finalize(stmt);
+                    throw std::runtime_error(err);
+                }
+
+                ret = sqlite3_reset(stmt);
+                if (SQLITE_OK != ret) {
+                    std::string err = "Client::on_message(): failed to reset statement: ";
+                    err += sqlite3_errmsg(m_db);
+                    sqlite3_finalize(stmt);
+                    throw std::runtime_error(err);
+                }
+            }
+            sqlite3_finalize(stmt);
 
         } else {
             std::cerr << "Unexpected mqtt topic postfix: " << topic << "\n";

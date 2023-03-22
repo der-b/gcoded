@@ -47,6 +47,7 @@ add_executable(gcode
                mqtt_messages/MsgAliases.cpp
                mqtt_messages/MsgAliasesSet.cpp
                mqtt_messages/MsgAliasesSetProvider.cpp
+               mqtt_messages/MsgSensorReadings.cpp
                mqtt_messages/MsgType.cpp
                gcode.cpp)
 
