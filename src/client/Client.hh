@@ -22,6 +22,13 @@ class Client : public MQTT::Listener {
             uint32_t print_remaining_time;
         };
 
+        struct SensorReading {
+            std::string sensor_name;
+            double current_value;
+            std::optional<std::string> unit;
+            std::optional<double> set_point;
+        };
+
         Client() = delete;
         Client(const ConfigGcode &conf);
         ~Client();
@@ -63,6 +70,11 @@ class Client : public MQTT::Listener {
          * Returns false, if the given device does not exist.
          */
         bool set_device_alias(const std::string &device_hint, const std::string &alias);
+
+        /**
+         * Returns the sensor readings for the devices.
+         */
+        std::unique_ptr<std::map<std::string, std::vector<SensorReading>>> sensor_readings(const std::string &device_hint);
 
     private:
         /**

@@ -878,6 +878,77 @@ bool Client::set_device_alias(const std::string &device_hint, const std::string 
 
 
 /*
+ * get_sensor_readings()
+ */
+std::unique_ptr<std::map<std::string, std::vector<Client::SensorReading>>> Client::sensor_readings(const std::string &device_hint)
+{
+    std::unique_ptr<std::map<std::string, std::vector<SensorReading>>> sr = std::make_unique<std::map<std::string, std::vector<SensorReading>>>();
+    sqlite3_stmt *stmt;
+    int ret;
+
+    std::pair<std::string, std::string> sql_hints = convert_hint(device_hint);
+
+    std::string s_stmt =  "SELECT sr.provider, a.alias, sr.device, d.device_alias, sr.sensor_name, sr.current_value, sr.set_point, sr.unit "
+                          "FROM sensor_readings AS sr "
+                          "LEFT JOIN devices AS d ON sr.provider = d.provider AND sr.device = d.device "
+                          "LEFT JOIN provider_alias AS a ON sr.provider = a.provider "
+                          "WHERE d.state!=0 ";
+    if (m_conf.resolve_aliases()) {
+        s_stmt += "AND (   d.device_alias LIKE '" + sql_hints.second + "' ESCAPE '\\' "
+                  "       OR (d.device_alias IS NULL AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\')) "
+                  "AND (   a.alias LIKE '" + sql_hints.first + "' ESCAPE '\\' "
+                  "     OR (a.alias IS NULL AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' )) ";
+    } else {
+        s_stmt += "AND d.device LIKE '" + sql_hints.second + "' ESCAPE '\\' "
+                  "AND d.provider LIKE '" + sql_hints.first + "' ESCAPE '\\' ";
+    }
+    s_stmt += "ORDER BY d.device_alias, d.device, a.alias, d.provider, sr.sensor_name;";
+
+    ret = sqlite3_prepare_v2(m_db,
+                             s_stmt.data(),
+                             s_stmt.size(),
+                             &stmt,
+                             NULL);
+    if (SQLITE_OK != ret) {
+        std::string err = "Client::sensor_readings(): Faild to prepare SELECT statement: ";
+        err += sqlite3_errmsg(m_db);
+        throw std::runtime_error(err);
+    }
+
+    while (SQLITE_ROW == (ret = sqlite3_step(stmt))) {
+        std::string device;
+        if (m_conf.resolve_aliases() && sqlite3_column_text(stmt, 1)) {
+            device =  (const char *)sqlite3_column_text(stmt, 1);
+        } else {
+            device  = (const char *)sqlite3_column_text(stmt, 0);
+        }
+        device += "/";
+        if (m_conf.resolve_aliases() && sqlite3_column_text(stmt, 3)) {
+            device += (const char *)sqlite3_column_text(stmt, 3);
+        } else {
+            device += (const char *)sqlite3_column_text(stmt, 2);
+        }
+        SensorReading value;
+        value.sensor_name =(const char *)sqlite3_column_text(stmt, 4);
+        value.current_value = sqlite3_column_double(stmt, 5);
+        if (SQLITE_FLOAT == sqlite3_column_type(stmt, 6)) {
+            value.set_point = sqlite3_column_double(stmt, 6);
+        } else {
+            value.set_point.reset();
+        }
+        if (SQLITE_TEXT == sqlite3_column_type(stmt, 7)) {
+            value.unit = (const char *)sqlite3_column_text(stmt, 7);
+        } else {
+            value.unit.reset();
+        }
+        (*sr)[device].push_back(value);
+    }
+
+    return sr;
+}
+
+
+/*
  * convert_hint()
  */
 std::pair<std::string, std::string> Client::convert_hint(const std::string &hint) const
