@@ -39,7 +39,8 @@ const char help_message[] =
 "COMMANDS: (get further details with \"-h\": e.g. \"gcode list -h\")\n"
 "list         Lists all currently known devices which can process gcode.\n"
 "send         Sends a gcode file to an device.\n"
-"alias        Manage aliases.\n";
+"alias        Manage aliases.\n"
+"sr           Show sensor readings.\n";
 
 
 const char list_usage_message[] = "gcode [OPTIONS] list [DEVICE_HINT]\n";
@@ -74,6 +75,16 @@ const char alias_help_message[] =
 "               ALIAS is the new alias of the provider or alias. This argument is optional. If it is\n"
 "               omitted, than the alias is removed\n";
 
+const char sr_usage_message[] = "gcode [OPTIONS] sr [DEVICE_HINT]\nn";
+const char sr_help_message[] =
+"Show sensor readings.\n"
+"DEVICE_HINT  A hint from which device the sensor readings shall be displayed\n"
+"             If no hint is given, than known sensor readings will be displayed.\n"
+"             The hint accepts '*' as a wildcard and tries to match device names.\n"
+"             If you want to match all devices of one provider, than you have to provide a\n"
+"             hint like 'providername/*'.\n"
+"             If a hint matches for more than one device, you will be prompt whether you are sure.\n";
+
 
 /*
  * constructor()
@@ -101,6 +112,8 @@ const char *ConfigGcode::usage() const
             return send_usage_message;
         } else if ("alias" == *m_command) {
             return alias_usage_message;
+        } else if ("sr" == *m_command) {
+            return sr_usage_message;
         } else {
             std::cerr << "Cant print command specific usage message: Unknown command.\n";
         }
@@ -121,6 +134,8 @@ const char *ConfigGcode::help() const
             return send_help_message;
         } else if ("alias" == *m_command) {
             return alias_help_message;
+        } else if ("sr" == *m_command) {
+            return sr_help_message;
         } else {
             std::cerr << "Cant print command specific help message: Unknown command.\n";
         }

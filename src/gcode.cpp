@@ -39,7 +39,7 @@ int send(Client &client, const ConfigGcode &conf)
         hint = conf.command_args()[1];
     }
     std::unique_ptr<std::vector<Client::DeviceInfo>> devices = client.devices(hint);
-    
+
     if (0 == devices->size()) {
         std::cerr << "No devices found.\n";
     }
@@ -109,7 +109,7 @@ int send(Client &client, const ConfigGcode &conf)
     while (count != 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    
+
     return 0;
 }
 
@@ -199,6 +199,53 @@ int alias(Client &client, const ConfigGcode &conf)
 
 
 /*
+ * sensor_readings()
+ */
+int sensor_readings(Client &client, const ConfigGcode &conf)
+{
+    if (!conf.command() || "sr" != *conf.command()) {
+        std::cerr << "Invalid command!\n";
+        return 1;
+    }
+
+    const size_t c_args_size = conf.command_args().size();
+    if (1 < c_args_size) {
+        std::cerr << "Too many arguments for list command. See 'gcode sr --help'.\n";
+        return 1;
+    }
+
+    std::string hint = "*";
+    if (1 <= c_args_size) {
+        hint = conf.command_args()[0];
+    }
+
+    const auto sr = client.sensor_readings(hint);
+    for (const auto &dev: *sr) {
+        for (const auto &value: dev.second) {
+            std::cout << dev.first
+                      << "\t"
+                      << value.sensor_name
+                      << "\t"
+                      << std::to_string(value.current_value);
+            if (value.set_point) {
+                std::cout << " (sp: "
+                          << std::to_string(*value.set_point)
+                          << ")";
+            }
+            if (value.unit) {
+                std::cout << " ["
+                          << *value.unit
+                          << "]";
+            }
+            std::cout << "\n";
+        }
+    }
+
+    return 0;
+}
+
+
+/*
  * main()
  */
 int main(int argc, char **argv)
@@ -256,6 +303,8 @@ int main(int argc, char **argv)
         return send(client, conf);
     } else if ("alias" == *conf.command()) {
         return alias(client, conf);
+    } else if ("sr" == *conf.command()) {
+        return sensor_readings(client, conf);
     } else {
         std::cerr << "Unknown command: \"" << *conf.command() << "\".\nSee --help for more information.\n";
         return 1;
