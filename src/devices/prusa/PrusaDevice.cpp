@@ -382,7 +382,7 @@ void PrusaDevice::parse_temp(const std::string &line)
 
         std::string type = m[0].str().substr(0, colon_pos);
         readings.current_value = std::stod(m[0].str().substr(colon_pos+1));
-        readings.unit = "°C";
+        readings.unit = "celsius";
 
         if (std::string::npos != slash_pos) {
             readings.set_point = std::stod(m[0].str().substr(slash_pos+1));
